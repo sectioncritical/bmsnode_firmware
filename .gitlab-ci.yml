@@ -1,0 +1,39 @@
+image: rubberduck/avr
+
+stages:
+    - build
+    - test
+    - release
+
+variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    BUILD_DIR: "build"
+    TEST_DIR: "test"
+
+cache:
+    paths:
+        - $PIP_CACHE_DIR
+#    - $BUILD_DIR/vertool
+#    - $BUILD_DIR/venv
+
+build:
+    stage: build
+    except:
+        - tags
+    script:
+        - "make -C $BUILD_DIR clean"
+        - "make -C $BUILD_DIR"
+    artifacts:
+        paths:
+            - "$BUILD_DIR/obj/bmsnode.*"
+
+test:
+    stage: test
+    except:
+        - tags
+    script:
+        - "make -C $BUILD_DIR cleantest"
+        - "make -C $BUILD_DIR test"
+    artifacts:
+        reports:
+            junit: "$TEST_DIR/bmstest-junit.xml"

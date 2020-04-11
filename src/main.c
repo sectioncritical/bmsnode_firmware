@@ -1,5 +1,30 @@
+/******************************************************************************
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright 2020 Joseph Kroesche
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
@@ -8,11 +33,12 @@
 #include <util/delay.h>
 #include <util/setbaud.h>
 
+#include "pkt.h"
+
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
  * clock divider of 1. So system runs at 8 MHz.
  */
-
 
 /*
  * Pin Assignments
@@ -58,6 +84,9 @@ void device_init(void)
     UBRR0L = UBRRL_VALUE;
 }
 
+static packet_t *nextpkt = NULL;
+static volatile bool pkt_available = false;
+
 ISR(USART0_RX_vect)
 {
     // read uart status
@@ -66,13 +95,25 @@ ISR(USART0_RX_vect)
     // check for rx received
     if (flags & _BV(RXC0))
     {
+        // first, propogate the bytes down the bus, no matter what else
+        // is going on
         uint8_t ch = UDR0;
         UDR0 = ch;
+
+        // process bytes into packets
+        packet_t *pkt = pkt_parser(ch);
+        if (pkt && (nextpkt == NULL))
+        {
+            // valid packet was received
+            nextpkt = pkt;
+            pkt_available = true;
+        }
     }
 }
 
 int main(int argc, char *argv[])
 {
+    // preserve the reset cause, take TBD actions
     uint8_t reset_cause = MCUSR;
     MCUSR = 0;
 
@@ -93,17 +134,28 @@ int main(int argc, char *argv[])
         // power-on reset
     }
 
+    // hardware init of MCU
     device_init();
 
+    // enable system interrupts
     sei();
 
+    // blinky loop
     while (1)
     {
         PORTA = _BV(PORTA6);
         _delay_ms(500);
         PORTA = 0;
         _delay_ms(500);
-        UDR0 = 'U';
+        UDR0 = 'Z'; // 0x5A
+
+        // clear incoming packet, if any
+        // this is a placeholder for eventual packet command process
+        if (pkt_available)
+        {
+            pkt_available = false;
+            pkt_rx_free(nextpkt);
+        }
     }
 
     return 0;
