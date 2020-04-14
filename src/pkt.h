@@ -92,6 +92,14 @@ extern void pkt_rx_free(packet_t *pkt);
 extern packet_t *pkt_rx_alloc(void);
 
 /**
+ * Get a received packet that is ready.
+ *
+ * @return A valid packet that has been received or NULL if there is no new
+ * available packet.
+ */
+extern packet_t *pkt_ready(void);
+
+/**
  * Process next byte in stream and parse packets.
  *
  * @param nextbyte next byte of incoming stream to parse
@@ -109,7 +117,7 @@ extern packet_t *pkt_rx_alloc(void);
  * @note This function is expected to be called from (UART RX) interrupt
  * context. So it should non-blocking and execute in minimal time.
  */
-extern packet_t *pkt_parser(uint8_t nextbyte);
+extern void pkt_parser(uint8_t nextbyte);
 
 #ifdef __cplusplus
 }

@@ -34,6 +34,7 @@
 #include <util/setbaud.h>
 
 #include "pkt.h"
+#include "serial.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -84,34 +85,9 @@ void device_init(void)
     UBRR0L = UBRRL_VALUE;
 }
 
-static packet_t *nextpkt = NULL;
-static volatile bool pkt_available = false;
+static uint8_t testdata[2] = { 'A', '-' };
 
-ISR(USART0_RX_vect)
-{
-    // read uart status
-    uint8_t flags = UCSR0A;
-
-    // check for rx received
-    if (flags & _BV(RXC0))
-    {
-        // first, propogate the bytes down the bus, no matter what else
-        // is going on
-        uint8_t ch = UDR0;
-        UDR0 = ch;
-
-        // process bytes into packets
-        packet_t *pkt = pkt_parser(ch);
-        if (pkt && (nextpkt == NULL))
-        {
-            // valid packet was received
-            nextpkt = pkt;
-            pkt_available = true;
-        }
-    }
-}
-
-int main(int argc, char *argv[])
+int main(void)
 {
     // preserve the reset cause, take TBD actions
     uint8_t reset_cause = MCUSR;
@@ -147,14 +123,15 @@ int main(int argc, char *argv[])
         _delay_ms(500);
         PORTA = 0;
         _delay_ms(500);
-        UDR0 = 'Z'; // 0x5A
+        //UDR0 = 'Z'; // 0x5A
+        ser_write(testdata, 2);
 
         // clear incoming packet, if any
         // this is a placeholder for eventual packet command process
-        if (pkt_available)
+        packet_t *pkt = pkt_ready();
+        if (pkt)
         {
-            pkt_available = false;
-            pkt_rx_free(nextpkt);
+            pkt_rx_free(pkt);
         }
     }
 

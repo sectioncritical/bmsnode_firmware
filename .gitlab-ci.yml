@@ -1,4 +1,6 @@
-image: rubberduck/avr
+image: python:3.7.7
+
+# need to use 3.7 because junit2html breaks in 3.8
 
 stages:
     - build
@@ -15,6 +17,9 @@ cache:
         - $PIP_CACHE_DIR
 #    - $BUILD_DIR/vertool
 #    - $BUILD_DIR/venv
+
+before_script:
+    - apt-get update && apt-get install -y gcc-avr avr-libc
 
 build:
     stage: build
@@ -35,5 +40,7 @@ test:
         - "make -C $BUILD_DIR cleantest"
         - "make -C $BUILD_DIR test"
     artifacts:
+        paths:
+            - "$TEST_DIR/reports/*.html"
         reports:
-            junit: "$TEST_DIR/bmstest-junit.xml"
+            junit: "$TEST_DIR/reports/bmstest-junit.xml"

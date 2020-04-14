@@ -75,7 +75,8 @@ static void send_preambles(int count)
 {
     while (count--)
     {
-        packet_t *pkt = pkt_parser(0x55);
+        pkt_parser(0x55);
+        packet_t *pkt = pkt_ready();
         if (pkt)
         {
             FAIL("expected NULL pkt, got non-NULL");
@@ -86,7 +87,8 @@ static void send_preambles(int count)
 // send a byte and expect NULL return
 static void send_byte_get_null(uint8_t databyte)
 {
-    packet_t *pkt = pkt_parser(databyte);
+    pkt_parser(databyte);
+    packet_t *pkt = pkt_ready();
     if (pkt)
     {
         FAIL("expected NULL pkt, got non-NULL");
@@ -98,7 +100,8 @@ static void send_bytes_get_null(uint8_t *pktdata, uint8_t len)
 {
     for (int idx = 0; idx < len; ++idx)
     {
-        packet_t *pkt = pkt_parser(pktdata[idx]);
+        pkt_parser(pktdata[idx]);
+        packet_t *pkt = pkt_ready();
         if (pkt)
         {
             FAIL("expected NULL pkt, got non-NULL");
@@ -109,7 +112,8 @@ static void send_bytes_get_null(uint8_t *pktdata, uint8_t len)
 // send a byte and expect to get a packet returned
 static packet_t *send_byte_get_pkt(uint8_t databyte)
 {
-    packet_t *pkt = pkt_parser(databyte);
+    pkt_parser(databyte);
+    packet_t *pkt = pkt_ready();
     if (!pkt)
     {
         FAIL("expected pkt, got NULL");
@@ -172,6 +176,12 @@ TEST_CASE("Packet parser")
 
     pkt_reset();
 
+    SECTION("no ready packet")
+    {
+        pkt = pkt_ready();
+        CHECK_FALSE(pkt);
+    }
+
     SECTION("no data")
     {
         send_preambles(3);
@@ -184,6 +194,9 @@ TEST_CASE("Packet parser")
         CHECK(pkt->addr == 1);
         CHECK(pkt->cmd == 0x42);
         CHECK(pkt->len == 0);
+        // verify pkt_ready() called again fails
+        pkt = pkt_ready();
+        CHECK_FALSE(pkt);
     }
 
     SECTION("1 data")

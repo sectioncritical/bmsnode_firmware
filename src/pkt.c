@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <util/crc16.h>
+#include <util/atomic.h>
 
 #include "pkt.h"
 
@@ -64,6 +65,9 @@ static bool rxbuf_inuse = false;
 // buffer used for RX packets
 static uint8_t rxbuf[16];
 
+// storage for received packet waiting for pickup
+static packet_t *ready_packet = NULL;
+
 //////////
 //
 // See header file for public function API descriptions.
@@ -73,32 +77,57 @@ static uint8_t rxbuf[16];
 // Reset the packet parser internal state.
 void pkt_reset(void)
 {
-    state = RX_SEARCH;
-    rxbuf_inuse = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        state = RX_SEARCH;
+        rxbuf_inuse = false;
+        ready_packet = NULL;
+    }
 }
 
 // Release an RX packet buffer for re-use.
 void pkt_rx_free(packet_t *pktbuf)
 {
-    rxbuf_inuse = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        rxbuf_inuse = false;
+    }
 }
 
 // Allocate RX packet buffer.
 packet_t *pkt_rx_alloc(void)
 {
-    if (!rxbuf_inuse)
+    packet_t *ret;
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
-        rxbuf_inuse = true;
-        return (packet_t *)rxbuf;
+        if (!rxbuf_inuse)
+        {
+            rxbuf_inuse = true;
+            ret = (packet_t *)rxbuf;
+        }
+        else
+        {
+            ret = NULL;
+        }
     }
-    else
+    return ret;
+}
+
+// return a received packet
+packet_t *pkt_ready(void)
+{
+    packet_t *ret;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
-        return NULL;
+        ret = ready_packet;
+        ready_packet = NULL;
     }
+    return ret;
 }
 
 // Process next byte in stream and parse packets.
-packet_t *pkt_parser(uint8_t nextbyte)
+void pkt_parser(uint8_t nextbyte)
 {
     static uint8_t idx;
     static uint8_t crc;
@@ -194,8 +223,8 @@ packet_t *pkt_parser(uint8_t nextbyte)
             state = RX_SEARCH;
             if (nextbyte == crc)
             {
-                // good packet, return to client
-                return (packet_t *)pbuf;
+                // good packet, save for client
+                ready_packet = (packet_t *)pbuf;
             }
             else
             {
@@ -208,5 +237,4 @@ packet_t *pkt_parser(uint8_t nextbyte)
             state = RX_SEARCH;
             break;
     }
-    return NULL;
 }

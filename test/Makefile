@@ -20,50 +20,94 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-PROGNAME=bmstest
-
 OBJDIR=obj
-
-C_SRCS=../src/pkt.c
-CPP_SRCS=test_main.cpp test_pkt.cpp
-
-C_OBJS:=$(C_SRCS:%.c=%.o)
-CPP_OBJS:=$(CPP_SRCS:%.cpp=%.o)
-C_OBJS:=$(addprefix $(OBJDIR)/, $(notdir $(C_OBJS)))
-CPP_OBJS:=$(addprefix $(OBJDIR)/, $(notdir $(CPP_OBJS)))
+BINDIR=bin
+REPORTDIR=reports
 
 INCS=-I ./ -I../src
 
-VPATH=./ ../src
+VPATH=./ ../src avr/
+
+TESTS=bmstest_pkt bmstest_serial
+
+PKT_OBJS=test_main.o test_pkt.o pkt.o
+SER_OBJS=test_main.o test_serial.o serial.o io.o
+
+TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
+TEST_SER_OBJS=$(addprefix $(OBJDIR)/, $(SER_OBJS))
+
+TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
+REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
 
 CC=gcc
 CXX=g++
 
-CFLAGS=-std=c99 -Os -Werror -Wall 
-CXXFLAGS=-std=c++11 -O0 -Werror -Wall
+CFLAGS=-std=c99 -O0 --coverage -Werror -Wall -DUNIT_TEST
+CXXFLAGS=-g -std=c++11 -O0 -Werror -Wall
 
-all: $(PROGNAME)
+LDFLAGS=--coverage
 
+all: $(TESTBINS)
+
+# packet test dependencies
+$(BINDIR)/bmstest_pkt: $(TEST_PKT_OBJS) | $(BINDIR)
+
+# serial test dependencies
+$(BINDIR)/bmstest_serial: $(TEST_SER_OBJS) | $(BINDIR)
+
+# compile a .c file
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+	$(CC) $(CFLAGS) $(INCS) -o $@  -c $<
+
+# compile a .cpp file
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) $(INCS) -o $@  -c $<
+
+# create test binary
+$(BINDIR)/bmstest_%:
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
+
+# create a junit report
+$(REPORTDIR)/bmstest_%-junit.xml: $(BINDIR)/bmstest_% | $(REPORTDIR)
+	$< -r junit > $@
+
+# combine all junit xml files
+$(REPORTDIR)/bmstest-junit.xml: venv $(REPORTS)
+	venv/bin/junit2html --merge $@ $(REPORTDIR)
+
+# generate html junit report
+$(REPORTDIR)/bmstest-junit.html: $(REPORTDIR)/bmstest-junit.xml
+	venv/bin/junit2html $< $@
+
+# generate code coverage report
+$(REPORTDIR)/bmstest-coverage.html: $(REPORTS)
+	venv/bin/gcovr -r ../src obj
+	venv/bin/gcovr -r ../src --html-details $@ obj
+
+report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html
+
+.PHONY: runtest
+runtest: $(TESTBINS)
+	@for bin in $(TESTBINS); do echo "TEST: $$bin"; $$bin; done
+
+.PHONY: clean
+clean:
+	rm -rf $(OBJDIR) $(BINDIR) $(REPORTDIR)
+
+# set up python virtual environment
+venv: venv/bin/activate
+
+venv/bin/activate: requirements.txt
+	test -d venv || python -m venv venv
+	. venv/bin/activate; pip install -U pip; pip install -Ur $<
+	touch venv/bin/activate
 
 $(OBJDIR):
 	mkdir -p $@
 
-$(OBJDIR)/%.o: %.c | $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCS) -o $@  -c $<
+$(BINDIR):
+	mkdir -p $@
 
-$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
-	$(CXX) $(CXXFLAGS) $(INCS) -o $@  -c $<
+$(REPORTDIR):
+	mkdir -p $@
 
-$(PROGNAME): $(C_OBJS) $(CPP_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-.PHONY: clean
-clean:
-	rm -rf $(OBJDIR)
-	rm -f $(PROGNAME)
-
-$(PROGNAME)-junit.xml: $(PROGNAME)
-	./$(PROGNAME) -r junit > $@
-	./$(PROGNAME) -s
-
-runtest: $(PROGNAME)-junit.xml
