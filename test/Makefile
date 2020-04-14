@@ -97,8 +97,10 @@ clean:
 # set up python virtual environment
 venv: venv/bin/activate
 
+PY3=$(shell command -v python3 || command -v python)
+
 venv/bin/activate: requirements.txt
-	test -d venv || python -m venv venv
+	test -d venv || $(PY3) -m venv venv
 	. venv/bin/activate; pip install -U pip; pip install -Ur $<
 	touch venv/bin/activate
 

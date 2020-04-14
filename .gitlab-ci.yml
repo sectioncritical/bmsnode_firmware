@@ -1,6 +1,4 @@
-image: python:3.7.7
-
-# need to use 3.7 because junit2html breaks in 3.8
+image: registry.gitlab.com/kroesche/bmsnode
 
 stages:
     - build
@@ -17,9 +15,6 @@ cache:
         - $PIP_CACHE_DIR
 #    - $BUILD_DIR/vertool
 #    - $BUILD_DIR/venv
-
-before_script:
-    - apt-get update && apt-get install -y gcc-avr avr-libc
 
 build:
     stage: build
