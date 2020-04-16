@@ -84,7 +84,26 @@ $(REPORTDIR)/bmstest-coverage.html: $(REPORTS)
 	venv/bin/gcovr -r ../src obj
 	venv/bin/gcovr -r ../src --html-details $@ obj
 
-report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html
+# generate cppcheck xml report
+$(REPORTDIR)/check.xml: | $(REPORTDIR)
+	cppcheck --std=c99 --platform=avr8 --enable=all --suppress=missingIncludeSystem -v ../src --xml-version=2 2> $@
+
+# generate cppcheck html report
+$(REPORTDIR)/check/index.html: $(REPORTDIR)/check.xml | $(REPORTDIR)/check
+	cppcheck-htmlreport --file=$< --report-dir=$(REPORTDIR)/check --source-dir=../src
+
+# generate cppcheck badge
+$(REPORTDIR)/check-badge.svg: $(REPORTDIR)/check.xml venv
+	CHECK_COUNT=$$(grep -o "error id" $< | wc -l | tr -d [:blank:]); \
+	venv/bin/anybadge -l cppcheck -v $$CHECK_COUNT -s " issues" -u -o -f $@ 1=green 6=yellow 7=brightred
+
+# run cppcheck with plain output - useful for local running, and no reports
+.PHONY: check
+check:
+	cppcheck --std=c99 --platform=avr8 --enable=all --suppress=missingIncludeSystem -v ../src
+
+.PHONY: report
+report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg
 
 .PHONY: runtest
 runtest: $(TESTBINS)
@@ -104,6 +123,10 @@ venv/bin/activate: requirements.txt
 	. venv/bin/activate; pip install -U pip; pip install -Ur $<
 	touch venv/bin/activate
 
+.PHONY: realclean
+realclean: clean
+	rm -rf venv
+
 $(OBJDIR):
 	mkdir -p $@
 
@@ -113,3 +136,5 @@ $(BINDIR):
 $(REPORTDIR):
 	mkdir -p $@
 
+$(REPORTDIR)/check:
+	mkdir -p $@
