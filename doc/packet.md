@@ -65,8 +65,13 @@ preamble byte followed by a single sync byte to mark the start of a packet.
 
 ### Flags
 
-The flags field is TBD at this time. It may hold a broadcast flag or some other
-flags such as a time sync bit.
+| Bit | Flag | Description                          |
+|-----|------|--------------------------------------|
+|  7  | reply| 0=command to node, 1=reply from node |
+|  6  | init | 0=normal, 1=init mode                |
+| 5:0 | res  | reserved                             |
+
+The function of the init flag is TBD.
 
 It is possible that the flags field could be combined with the length field
 to eliminate one byte of header.
@@ -86,7 +91,11 @@ of the responding node.
 
 ### Command
 
-The command code. Command codes are TBD.
+| ID | Command | Description                 |
+|----|---------|-----------------------------|
+|  0 | reserved| not used                    |
+|  1 | ping    | bus detection and aliveness |
+|  2 | bootload| enter boot loader mode      |
 
 ### Length
 

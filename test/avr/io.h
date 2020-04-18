@@ -16,6 +16,7 @@ extern "C" {
 extern volatile uint8_t UCSR0B;
 extern volatile uint8_t UCSR0A;
 extern volatile uint8_t UDR0;
+extern volatile uint8_t MCUSR;
 
 #ifdef __cplusplus
 }

@@ -26,15 +26,17 @@ REPORTDIR=reports
 
 INCS=-I ./ -I../src
 
-VPATH=./ ../src avr/
+VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_pkt bmstest_serial
+TESTS=bmstest_pkt bmstest_serial bmstest_cmd
 
-PKT_OBJS=test_main.o test_pkt.o pkt.o
+PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
 SER_OBJS=test_main.o test_serial.o serial.o io.o
+CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o
 
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
 TEST_SER_OBJS=$(addprefix $(OBJDIR)/, $(SER_OBJS))
+TEST_CMD_OBJS=$(addprefix $(OBJDIR)/, $(CMD_OBJS))
 
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
@@ -54,6 +56,9 @@ $(BINDIR)/bmstest_pkt: $(TEST_PKT_OBJS) | $(BINDIR)
 
 # serial test dependencies
 $(BINDIR)/bmstest_serial: $(TEST_SER_OBJS) | $(BINDIR)
+
+# command test dependencies
+$(BINDIR)/bmstest_cmd: $(TEST_CMD_OBJS) | $(BINDIR)
 
 # compile a .c file
 $(OBJDIR)/%.o: %.c | $(OBJDIR)

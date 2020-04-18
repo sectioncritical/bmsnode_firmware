@@ -32,7 +32,7 @@ AVRDUDE_PORT?=/dev/cu.usbmodem14101
 OUT=obj
 SRC=../src
 
-OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/serial.o
+OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o
 
 HEXFILE:=$(OUT)/$(PROGNAME).hex
 ELFFILE:=$(OUT)/$(PROGNAME).elf

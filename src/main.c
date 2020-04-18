@@ -33,7 +33,7 @@
 #include <util/delay.h>
 #include <util/setbaud.h>
 
-#include "pkt.h"
+#include "cmd.h"
 #include "serial.h"
 
 /*
@@ -85,7 +85,7 @@ void device_init(void)
     UBRR0L = UBRRL_VALUE;
 }
 
-static uint8_t testdata[2] = { 'A', '-' };
+//static uint8_t testdata[2] = { 'A', '-' };
 
 int main(void)
 {
@@ -124,15 +124,9 @@ int main(void)
         PORTA = 0;
         _delay_ms(500);
         //UDR0 = 'Z'; // 0x5A
-        ser_write(testdata, 2);
+        //ser_write(testdata, 2);
 
-        // clear incoming packet, if any
-        // this is a placeholder for eventual packet command process
-        packet_t *pkt = pkt_ready();
-        if (pkt)
-        {
-            pkt_rx_free(pkt);
-        }
+        cmd_process();
     }
 
     return 0;

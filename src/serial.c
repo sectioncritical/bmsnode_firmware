@@ -85,9 +85,11 @@ bool rxint_disable(void)
 //////////
 
 // write data to the serial output
-int ser_write(uint8_t *buf, int len)
+// TODO: consider all or nothing write, instead of partial when there
+// is not enough room in the buffer
+uint8_t ser_write(uint8_t *buf, uint8_t len)
 {
-    int cnt = 0;
+    uint8_t cnt = 0;
     CRITICAL_RX()
     {
         while (BUF_NOTFULL() && len--)

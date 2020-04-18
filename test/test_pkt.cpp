@@ -28,36 +28,26 @@
 
 #include "catch.hpp"
 #include "pkt.h"
+#include "serial.h"
 #include "util/crc16.h"
+
+// we are using fast-faking-framework for provding fake functions called
+// by serial module.
+// https://github.com/meekrosoft/fff
+#include "fff.h"
+DEFINE_FFF_GLOBALS;
+
+// declare C-type functions
+extern "C" {
+
+// mock function for ser_write
+FAKE_VALUE_FUNC(uint8_t, ser_write, uint8_t *, uint8_t);
+
+}
 
 // This test suite is validating the function of the packet parser. It is
 // only checking the parser itself, and not anything related to the contents
 // of the packets.
-
-// provde the crc8 function that is provided by the avr-libc library so
-// that the module-under-test can resolve the link. Also this is used by
-// test cases here to generate the 8-bit crc for test packets.
-uint8_t _crc8_ccitt_update(uint8_t inCrc, uint8_t inData)
-{
-    uint8_t i;
-    uint8_t data;
-
-    data = inCrc ^ inData;
-
-    for (i = 0; i < 8; i++)
-    {
-        if ((data & 0x80) != 0)
-        {
-            data <<= 1;
-            data ^= 0x07;
-        }
-        else
-        {
-            data <<= 1;
-        }
-    }
-    return data;
-}
 
 // return the crc8 for a chunk of data
 // crc is ongoing crc
@@ -193,6 +183,23 @@ TEST_CASE("Packet parser")
         CHECK(pkt->flags == 0xEE);
         CHECK(pkt->addr == 1);
         CHECK(pkt->cmd == 0x42);
+        CHECK(pkt->len == 0);
+        // verify pkt_ready() called again fails
+        pkt = pkt_ready();
+        CHECK_FALSE(pkt);
+    }
+
+    SECTION("ping packet")
+    {
+        send_preambles(3);
+        send_sync();
+        crc = send_hdr_get_crc(0, 1, 1, 0);
+        INFO("CRC is " << crc);
+        pkt = send_byte_get_pkt(crc);
+        REQUIRE(pkt);
+        CHECK(pkt->flags == 0);
+        CHECK(pkt->addr == 1);
+        CHECK(pkt->cmd == 1);
         CHECK(pkt->len == 0);
         // verify pkt_ready() called again fails
         pkt = pkt_ready();
@@ -375,3 +382,155 @@ TEST_CASE("Packet parser")
     }
 }
 
+TEST_CASE("Packet send")
+{
+    // expected preamble plus sync bytes
+    uint8_t sync[5] = { 0x55, 0x55, 0x55, 0x55, 0xF0 };
+
+    // sample payload data
+    uint8_t buf[12] = { 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0 };
+
+    // header data
+    // start crc computation
+    uint8_t flags = 0x88;
+    uint8_t addr = 99;
+    uint8_t cmd = 13;
+    uint8_t len; // set in test case
+    uint8_t crc = _crc8_ccitt_update(0, flags);
+    crc = _crc8_ccitt_update(crc, addr);
+    crc = _crc8_ccitt_update(crc, cmd);
+
+    RESET_FAKE(ser_write);
+
+    SECTION("len too long")
+    {
+        bool ret = pkt_send(flags, addr, cmd, buf, 13);
+        CHECK_FALSE(ret);
+        CHECK_FALSE(ser_write_fake.call_count);
+    }
+
+    SECTION("zero payload bytes")
+    {
+        len = 0;
+        crc = _crc8_ccitt_update(crc, len);
+        uint8_t totlen = len + 10;
+        ser_write_fake.return_val = totlen;
+
+        bool ret = pkt_send(flags, addr, cmd, buf, len);
+        CHECK(ret);
+        REQUIRE(ser_write_fake.call_count == 1);
+        uint8_t *txbuf = ser_write_fake.arg0_val;
+        uint8_t txlen = ser_write_fake.arg1_val;
+        CHECK(txlen == totlen);
+        CHECK(memcmp(sync, txbuf, 5) == 0);
+        CHECK(txbuf[5] == flags);
+        CHECK(txbuf[6] == addr);
+        CHECK(txbuf[7] == cmd);
+        CHECK(txbuf[8] == len);
+        CHECK(txbuf[9] == crc);
+    }
+
+    SECTION("one payload byte")
+    {
+        len = 1;
+        crc = _crc8_ccitt_update(crc, len);
+        for (int i = 0; i < len; i++)
+        {
+            crc = _crc8_ccitt_update(crc, buf[i]);
+        }
+        uint8_t totlen = len + 10;
+        ser_write_fake.return_val = totlen;
+
+        bool ret = pkt_send(flags, addr, cmd, buf, len);
+        CHECK(ret);
+        REQUIRE(ser_write_fake.call_count == 1);
+        uint8_t *txbuf = ser_write_fake.arg0_val;
+        uint8_t txlen = ser_write_fake.arg1_val;
+        CHECK(txlen == totlen);
+        CHECK(memcmp(sync, txbuf, 5) == 0);
+        CHECK(txbuf[5] == flags);
+        CHECK(txbuf[6] == addr);
+        CHECK(txbuf[7] == cmd);
+        CHECK(txbuf[8] == len);
+        CHECK(memcmp(&txbuf[9], buf, len) == 0);
+        CHECK(txbuf[totlen - 1] == crc);
+    }
+
+    SECTION("some payload bytes")
+    {
+        len = 7;
+        crc = _crc8_ccitt_update(crc, len);
+        for (int i = 0; i < len; i++)
+        {
+            crc = _crc8_ccitt_update(crc, buf[i]);
+        }
+        uint8_t totlen = len + 10;
+        ser_write_fake.return_val = totlen;
+
+        bool ret = pkt_send(flags, addr, cmd, buf, len);
+        CHECK(ret);
+        REQUIRE(ser_write_fake.call_count == 1);
+        uint8_t *txbuf = ser_write_fake.arg0_val;
+        uint8_t txlen = ser_write_fake.arg1_val;
+        CHECK(txlen == totlen);
+        CHECK(memcmp(sync, txbuf, 5) == 0);
+        CHECK(txbuf[5] == flags);
+        CHECK(txbuf[6] == addr);
+        CHECK(txbuf[7] == cmd);
+        CHECK(txbuf[8] == len);
+        CHECK(memcmp(&txbuf[9], buf, len) == 0);
+        CHECK(txbuf[totlen - 1] == crc);
+    }
+
+    SECTION("max payload bytes")
+    {
+        len = 12;
+        crc = _crc8_ccitt_update(crc, len);
+        for (int i = 0; i < len; i++)
+        {
+            crc = _crc8_ccitt_update(crc, buf[i]);
+        }
+        uint8_t totlen = len + 10;
+        ser_write_fake.return_val = totlen;
+
+        bool ret = pkt_send(flags, addr, cmd, buf, len);
+        CHECK(ret);
+        REQUIRE(ser_write_fake.call_count == 1);
+        uint8_t *txbuf = ser_write_fake.arg0_val;
+        uint8_t txlen = ser_write_fake.arg1_val;
+        CHECK(txlen == totlen);
+        CHECK(memcmp(sync, txbuf, 5) == 0);
+        CHECK(txbuf[5] == flags);
+        CHECK(txbuf[6] == addr);
+        CHECK(txbuf[7] == cmd);
+        CHECK(txbuf[8] == len);
+        CHECK(memcmp(&txbuf[9], buf, len) == 0);
+        CHECK(txbuf[totlen - 1] == crc);
+    }
+
+    SECTION("return len mismatch")
+    {
+        len = 12;
+        crc = _crc8_ccitt_update(crc, len);
+        for (int i = 0; i < len; i++)
+        {
+            crc = _crc8_ccitt_update(crc, buf[i]);
+        }
+        uint8_t totlen = len + 10;
+        ser_write_fake.return_val = totlen - 1;
+
+        bool ret = pkt_send(flags, addr, cmd, buf, len);
+        CHECK_FALSE(ret);
+        REQUIRE(ser_write_fake.call_count == 1);
+        uint8_t *txbuf = ser_write_fake.arg0_val;
+        uint8_t txlen = ser_write_fake.arg1_val;
+        CHECK(txlen == totlen);
+        CHECK(memcmp(sync, txbuf, 5) == 0);
+        CHECK(txbuf[5] == flags);
+        CHECK(txbuf[6] == addr);
+        CHECK(txbuf[7] == cmd);
+        CHECK(txbuf[8] == len);
+        CHECK(memcmp(&txbuf[9], buf, len) == 0);
+        CHECK(txbuf[totlen - 1] == crc);
+    }
+}

@@ -22,35 +22,70 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __SERIAL_H__
-#define __SERIAL_H__
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <avr/io.h>
 
-/**
- * Write data to the serial transmit buffer.
- *
- * @param buf buffer holding data to write
- * @param len count of bytes to write
- *
- * Copies data bytes from _buf_ to the serial transmit buffer. If there are
- * more bytes that will fit in the TX buffer then the return value will
- * indicate the number that were actually copied. Once this function is called,
- * any bytes in the buffer will be transmitted on the serial port.
- *
- * @return the number of bytes that were copied to the transmit buffer.
- */
-extern uint8_t ser_write(uint8_t *buf, uint8_t len);
+#include "pkt.h"
+#include "cmd.h"
 
-/**
- * Flush the serial transmit buffer. Resets the internal state.
- */
-extern void ser_flush(void);
 
-#ifdef __cplusplus
+//////////
+//
+// See header file for public function API descriptions.
+//
+//////////
+
+// hard code a node id for now
+static uint8_t nodeid = 1;
+
+static void(*swreset)(void) = 0;
+
+// implement PING command
+static bool cmd_ping(packet_t *pkt)
+{
+    return pkt_send(PKT_FLAG_REPLY, pkt->addr, pkt->cmd, NULL, 0);
 }
-#endif
 
-#endif
+// implement BOOTLOAD command
+static bool cmd_bootload(packet_t *pkt)
+{
+    // TODO: put IO pins in safe state
+    // TODO: should it send a reply? then it will need to wait until
+    // message was sent before resetting
+    MCUSR = 0;
+    swreset();
+    return false;
+}
+
+// run command processor
+bool cmd_process(void)
+{
+    bool ret = false;
+    packet_t *pkt = pkt_ready();
+
+    if (pkt)
+    {
+        if (pkt->addr == nodeid)
+        {
+            switch (pkt->cmd)
+            {
+                case CMD_PING:
+                    ret = cmd_ping(pkt);
+                    break;
+
+                case CMD_BOOTLOAD:
+                    ret = cmd_bootload(pkt);
+                    break;
+
+                default:
+                    ret = false;
+                    break;
+            }
+        }
+        pkt_rx_free(pkt);
+    }
+    return ret;
+}

@@ -22,32 +22,38 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __SERIAL_H__
-#define __SERIAL_H__
+#ifndef __CMD_H__
+#define __CMD_H__
+
+/**
+ * PING command code
+ *
+ * Causes a ping reply packets to be sent.
+ */
+#define CMD_PING 1
+
+/**
+ * BOOTLOAD command code
+ *
+ * Causes the node to enter boot loader mode.
+ * */
+#define CMD_BOOTLOAD 2
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * Write data to the serial transmit buffer.
+ * Run the command processor.
  *
- * @param buf buffer holding data to write
- * @param len count of bytes to write
+ * This function should be called periodically from the main loop. It checks
+ * for any available incoming packets. It checks if the packets is intended
+ * for this node. If so then it dispatches the command for further processing
+ * according to its function.
  *
- * Copies data bytes from _buf_ to the serial transmit buffer. If there are
- * more bytes that will fit in the TX buffer then the return value will
- * indicate the number that were actually copied. Once this function is called,
- * any bytes in the buffer will be transmitted on the serial port.
- *
- * @return the number of bytes that were copied to the transmit buffer.
+ * @return returns `true` if a command was processed and `false` if not.
  */
-extern uint8_t ser_write(uint8_t *buf, uint8_t len);
-
-/**
- * Flush the serial transmit buffer. Resets the internal state.
- */
-extern void ser_flush(void);
+extern bool cmd_process(void);
 
 #ifdef __cplusplus
 }

@@ -29,6 +29,7 @@
 #include <util/atomic.h>
 
 #include "pkt.h"
+#include "serial.h"
 
 /*
  * |Byte| Field  | Description                              |
@@ -67,6 +68,16 @@ static uint8_t rxbuf[16];
 
 // storage for received packet waiting for pickup
 static packet_t *ready_packet = NULL;
+
+// buffer used for assembling outgoing packets
+typedef struct
+{
+    const uint8_t preambles[4];
+    const uint8_t sync;
+    packet_t pkt;
+} txpacket_t;
+static txpacket_t txpkt =
+{ {PKT_PREAMBLE, PKT_PREAMBLE, PKT_PREAMBLE, PKT_PREAMBLE}, PKT_SYNC };
 
 //////////
 //
@@ -124,6 +135,65 @@ packet_t *pkt_ready(void)
         ready_packet = NULL;
     }
     return ret;
+}
+
+// assemble a packet and send it
+// this uses and extra buffer to assemble the packet instead of just
+// sending bytes one at a time. this ensures that the entire packet
+// gets copied into the serial output buffer without getting corrupted
+// by any incoming data at the time. If there was already incoming data then
+// this could corrupt the incoming packet for downstream nodes
+// TODO: add a lock to prevent outgoing while processing an incoming
+bool pkt_send(uint8_t flags, uint8_t addr, uint8_t cmd,
+              uint8_t *payload, uint8_t len)
+{
+    uint8_t idx;
+    uint8_t crc = 0; // init the crc
+
+    // sanity check the payload length
+    if (len > PKT_PAYLOAD_LEN)
+    {
+        return false;
+    }
+
+    // populate the header bytes
+    txpkt.pkt.flags = flags;
+    txpkt.pkt.addr = addr;
+    txpkt.pkt.cmd = cmd;
+    txpkt.pkt.len = len;
+
+    // compute the crc over the header
+    // could be more efficient with count down loop
+    for (idx = 0; idx < 4; ++idx)
+    {
+        crc = _crc8_ccitt_update(crc, ((uint8_t *)&txpkt.pkt)[idx]);
+    }
+
+    // copy the payload into the buffer and compute ongoing crc
+    for (idx = 0; idx < len; ++idx)
+    {
+        txpkt.pkt.payload[idx] = payload[idx];
+        crc = _crc8_ccitt_update(crc, payload[idx]);
+    }
+
+    // put crc on end of payload
+    // depending on payload len, this may not be the actual
+    // crc field of packet_t
+    txpkt.pkt.payload[idx] = crc;
+
+    // compute total length. it is number of payload bytes,
+    // plus 4 header bytes, plus 4 preamble and 1 sync, plus crc
+    len = 4 + 1 + 4 + len + 1;
+
+    // send the packet to serial output
+    idx = ser_write((uint8_t *)&txpkt, len);
+
+    if (idx != len)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 // Process next byte in stream and parse packets.

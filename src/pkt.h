@@ -48,6 +48,9 @@ typedef struct
     uint8_t crc;    //< CRC over header and data
 } packet_t;
 
+#define PKT_FLAG_REPLY 0x80 //< indicates reply packet
+#define PKT_FLAG_INIT 0x40  //< node init packet
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -98,6 +101,28 @@ extern packet_t *pkt_rx_alloc(void);
  * available packet.
  */
 extern packet_t *pkt_ready(void);
+
+/**
+ * Assemble a packet and send it.
+ *
+ * @param flags flags field TBD
+ * @param addr packet address
+ * @param cmd packet command
+ * @param payload pointer to buffer containing payload data
+ * @param len length of payload data (can be 0)
+ *
+ * This function will assemble a packet, along with the computed CRC and
+ * the preamble and sync bytes, and transmit it on the serial port. Upon
+ * return, all data will have been copied into an outgoing buffer, so the
+ * payload data buffer can be reused. The outgoing packet is queued, but will
+ * still be in progress when this function returns.
+ *
+ * @return `true` if the packet was copied to output, `false` if not. A return
+ * value of false means that the packet could not fit in the serial transmit
+ * buffer.
+ */
+extern bool pkt_send(uint8_t flags, uint8_t addr, uint8_t cmd,
+                     uint8_t *payload, uint8_t len);
 
 /**
  * Process next byte in stream and parse packets.
