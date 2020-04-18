@@ -198,6 +198,25 @@ def cli():
     print(rpkt)
     print("")
 
+    # boot packet
+    pkt = NodePacket(address=1, command=2, reply=False)
+    pkt.serport = ser
+    print("")
+    print("Outgoing packet")
+    print(pkt)
+    print("")
+
+    pkt.send()
+
+    rpkt = NodePacket()
+    rpkt.serport = ser
+    rpkt = pkt.recv()
+
+    print("")
+    print("Incoming packet")
+    print(rpkt)
+    print("")
+
 
 if __name__ == '__main__':
     cli()

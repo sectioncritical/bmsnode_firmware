@@ -27,6 +27,7 @@
 #include <stddef.h>
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 #include "pkt.h"
 #include "cmd.h"
@@ -55,6 +56,8 @@ static bool cmd_bootload(packet_t *pkt)
     // TODO: put IO pins in safe state
     // TODO: should it send a reply? then it will need to wait until
     // message was sent before resetting
+    // optiboot expects interrupts to be disabled
+    cli();
     MCUSR = 0;
     swreset();
     return false;

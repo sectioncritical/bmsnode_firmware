@@ -28,11 +28,24 @@ PROGNAME=bmsnode
 AVRDUDE?=$(HOME)/.platformio/packages/tool-avrdude/bin/avrdude
 AVRDUDE_CONF?=$(HOME)/.platformio/packages/tool-avrdude/avrdude.conf
 AVRDUDE_PORT?=/dev/cu.usbmodem14101
+AVRDUDE_LOAD_PORT?=/dev/cu.SLAB_USBtoUART
 
 OUT=obj
 SRC=../src
 
 OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o
+
+# device remains unlocked
+LOCKFUSE=0xff
+
+# EESAVE (dont erase eeprom), BOD level is 1.8
+HFUSE=0xd6
+
+# disable CLKDIV8 (run at 8mhz). use 8MHz internal osc
+LFUSE=0xe2
+
+# BOD enabled in all modes, enable self programming
+EFUSE=0xf4
 
 HEXFILE:=$(OUT)/$(PROGNAME).hex
 ELFFILE:=$(OUT)/$(PROGNAME).elf
@@ -47,7 +60,12 @@ help:
 	@echo ""
 	@echo "all/(default)    - build the firmware hex file"
 	@echo "clean            - delete all build products"
-	@echo "program          - program target using avrdude"
+	@echo "program          - program target using avrdude/programmer"
+	@echo "upload           - upload using serial boot loader w/avrdude"
+	@echo ""
+	@echo "fuses            - program the fuses using programmer"
+	@echo "program_boot     - program the boot loader using programmer"
+	@echo "erase            - erase the device using programmer"
 	@echo ""
 	@echo "test             - build and run the unit test"
 	@echo "cleantest        - clean the unit test"
@@ -81,6 +99,22 @@ clean:
 .PHONY: program
 program: $(HEXFILE)
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+
+.PHONY: program_boot
+program_boot: optiboot/optiboot_bms_8_4800.hex
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+
+.PHONY: upload
+upload: $(HEXFILE)
+	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
+
+.PHONY: fuses
+fuses:
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -Ulock:w:$(LOCKFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -Uefuse:w:$(EFUSE):m
+
+.PHONY: erase
+erase:
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -e
 
 .PHONY: test
 test:

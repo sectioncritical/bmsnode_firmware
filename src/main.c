@@ -27,11 +27,13 @@
 #include <stddef.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 
 #define F_CPU 8000000L
 #define BAUD 4800
 #include <util/delay.h>
 #include <util/setbaud.h>
+#include <util/atomic.h>
 
 #include "cmd.h"
 #include "serial.h"
@@ -83,15 +85,51 @@ void device_init(void)
     UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); // 8n1
     UBRR0H = UBRRH_VALUE;
     UBRR0L = UBRRL_VALUE;
+
+    // 1 ms timer tick using timer 0
+    // 8mhz w /64 prescaler = 125000 hz
+    // 125000 Hz /125 ==> 1 khz --> 1 ms
+    // timer 0 in CTC mode, count up, OCR0A=124, OCF0A interrupt
+    TCCR0A = _BV(WGM01); // CTC mode
+    TCCR0B = _BV(CS01) | _BV(CS00); // prescaler /64
+    OCR0A = 124;
+    TIMSK0 = _BV(OCIE0A);
+    // timer should be running and generating 1 ms interrupts
+}
+
+static volatile uint16_t systick = 0;
+
+// TODO: timer isr here for now. create timer module
+ISR(TIMER0_COMPA_vect)
+{
+    ++systick;
+}
+
+static uint16_t get_systick(void)
+{
+    uint16_t ticks;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        ticks = systick;
+    }
+    return ticks;
+}
+
+static bool is_timeout(uint16_t start, uint16_t timeout)
+{
+    return (get_systick() - start) >= timeout;
 }
 
 //static uint8_t testdata[2] = { 'A', '-' };
+
+static uint16_t ticks_blink;
 
 int main(void)
 {
     // preserve the reset cause, take TBD actions
     uint8_t reset_cause = MCUSR;
     MCUSR = 0;
+    wdt_disable();
 
     if (reset_cause & WDRF)
     {
@@ -116,13 +154,17 @@ int main(void)
     // enable system interrupts
     sei();
 
+    ticks_blink = get_systick();
+
     // blinky loop
     while (1)
     {
-        PORTA = _BV(PORTA6);
-        _delay_ms(500);
-        PORTA = 0;
-        _delay_ms(500);
+        if (is_timeout(ticks_blink, 500))
+        {
+            ticks_blink += 500;
+            PORTA ^= _BV(PORTA6);
+        }
+
         //UDR0 = 'Z'; // 0x5A
         //ser_write(testdata, 2);
 
