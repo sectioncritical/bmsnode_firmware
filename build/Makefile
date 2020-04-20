@@ -22,13 +22,30 @@
 
 PROGNAME=bmsnode
 
-# settings for avrdude. These default settings assume you have platformio
-# version of avrdude in the default location. These can be overidden in the
-# environment or on make command line
-AVRDUDE?=$(HOME)/.platformio/packages/tool-avrdude/bin/avrdude
-AVRDUDE_CONF?=$(HOME)/.platformio/packages/tool-avrdude/avrdude.conf
+# AVRDUDE ports
+# you will need to override these for your system. The easiest thing to do
+# is to set an environment variable and then you wont need to type on command
+# line each time you run this Makefile.
+#
+# AVRDUDE_PORT is the device port used for programmer like ArduinoISP
+# it is used for any Makefile targets that "program" something. If you are
+# not using the programmer, then this does not matter.
+#
+# AVRDUDE_LOAD_PORT is a device serial port used for using avrdude with the
+# serial boot loader. It is the serial port that is connected to your bmsnode
+# boards. This is used with "upload" targets.
+#
 AVRDUDE_PORT?=/dev/cu.usbmodem14101
 AVRDUDE_LOAD_PORT?=/dev/cu.SLAB_USBtoUART
+
+# settings for avrdude binary. You can override these to match your system.
+# avrdude should be installed somewhere on your system. The default setting
+# below assumes it is on your path. Standard avrdude does not include
+# support for t841 so the t841.conf file is specified as a supplement.
+# You can override the location of avrdude executable and conf file if you
+# need to. (the + means add to system configuration)
+AVRDUDE?=$(shell command -v avrdude)
+AVRDUDE_CONF?= +avrdude/t841.conf
 
 OUT=obj
 SRC=../src
