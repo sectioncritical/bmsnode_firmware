@@ -22,6 +22,9 @@
 
 PROGNAME=bmsnode
 
+# name of package for updating
+PKG?=0.0.0
+
 # AVRDUDE ports
 # you will need to override these for your system. The easiest thing to do
 # is to set an environment variable and then you wont need to type on command
@@ -66,6 +69,8 @@ EFUSE=0xf4
 
 HEXFILE:=$(OUT)/$(PROGNAME).hex
 ELFFILE:=$(OUT)/$(PROGNAME).elf
+UPLOADFILE?=$(HEXFILE)
+PKGNAME:=$(PROGNAME)-$(PKG)
 
 all: $(HEXFILE)
 
@@ -80,12 +85,17 @@ help:
 	@echo "program          - program target using avrdude/programmer"
 	@echo "upload           - upload using serial boot loader w/avrdude"
 	@echo ""
+	@echo "bootload ADDR=1 PKG=1.0.0 - bootload new firmware onto node"
+	@echo ""
 	@echo "fuses            - program the fuses using programmer"
 	@echo "program_boot     - program the boot loader using programmer"
 	@echo "erase            - erase the device using programmer"
 	@echo ""
 	@echo "test             - build and run the unit test"
 	@echo "cleantest        - clean the unit test"
+	@echo ""
+	@echo "venv             - create the python virtual environment"
+	@echo "cleanvenv        - clean the python virtual environment"
 	@echo ""
 
 CC=avr-gcc
@@ -122,7 +132,7 @@ program_boot: optiboot/optiboot_bms_8_4800.hex
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
 .PHONY: upload
-upload: $(HEXFILE)
+upload: $(UPLOADFILE)
 	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
 
 .PHONY: fuses
@@ -137,6 +147,33 @@ erase:
 test:
 	make -C ../test report
 
+$(PKGNAME)/$(PROGNAME).hex: $(PKGNAME).tar.gz
+	tar -xvf $<
+
+.PHONY: bootload
+bootload: $(PKGNAME)/$(PROGNAME).hex venv
+	venv/bin/bmsutil bootload -a $(ADDR)
+	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
+
+.PHONY: discover
+discover: venv
+	venv/bin/bmsutil discover
+
 .PHONY: cleantest
 cleantest:
 	make -C ../test clean
+
+# system should have python3 available as either python3 or python
+PY3?=$(shell command -v python3 || command -v python)
+
+# set up python virtual environment needed for platformio
+venv: venv/bin/activate
+
+venv/bin/activate: requirements.txt
+	test -d venv || $(PY3) -m venv venv
+	. venv/bin/activate; pip install -U pip; pip install -Ur $<
+	touch venv/bin/activate
+
+.PHONY: cleanvenv
+cleanvenv:
+	rm -rf venv

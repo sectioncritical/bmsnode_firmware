@@ -31,6 +31,7 @@ class NodePacket(object):
         self._len = len(payload) if payload else 0
         self._flags = 0x80 if reply else 0
         self._serial = None
+        self._verbose = False
 
     def __repr__(self):
         return str(vars(self))
@@ -43,6 +44,16 @@ class NodePacket(object):
                 info += "{:02X} ".format(datitem)
             info += "\n"
         return info
+
+    @property
+    def verbose(self):
+        return self._verbose
+
+    @verbose.setter
+    def verbose(self, isverbose):
+        if not isinstance(isverbose, bool):
+            raise TypeError("verbose property should be a bool")
+        self._verbose = isverbose
 
     @property
     def address(self):
@@ -111,23 +122,39 @@ class NodePacket(object):
         packet.append(crc)
         presync = [ 0x55, 0x55, 0x55, 0x55, 0xF0 ]
         packet = bytes(presync + packet)
-        print("SENDING", ''.join('{:02X} '.format(x) for x in packet))
+        if self._verbose:
+            print("SENDING", ''.join('{:02X} '.format(x) for x in packet))
         self._serial.write(packet)
 
+    # TODO: need to rewrite as state machine with singe byte read at top
+    # with timeout used to exit
     def recv(self):
         pktbytes = None
-        nextbyte = self._serial.read(1)[0]
-        print("RECV: {:02X} ".format(nextbyte), end="")
+        nextbytes = self._serial.read(1)
+        if len(nextbytes) != 1:
+            return None
+
+        nextbyte = nextbytes[0]
+        if self._verbose:
+            print("RECV: {:02X} ".format(nextbyte), end="")
 
         # wait for preamble to show up
         while nextbyte != 0x55:
-            nextbyte = self._serial.read(1)[0]
-            print("{:02X} ".format(nextbyte), end="")
+            nextbytes = self._serial.read(1)
+            if len(nextbytes) != 1:
+                return None
+            nextbyte = nextbytes[0]
+            if self._verbose:
+                print("{:02X} ".format(nextbyte), end="")
 
         # while receiving preables, look for sync
         while True:
-            nextbyte = self._serial.read(1)[0]
-            print("{:02X} ".format(nextbyte), end="")
+            nextbytes = self._serial.read(1)
+            if len(nextbytes) != 1:
+                return None
+            nextbyte = nextbytes[0]
+            if self._verbose:
+                print("{:02X} ".format(nextbyte), end="")
             if nextbyte == 0xF0: # found sync, proceed
                 break
             if nextbyte != 0x55: # not preamble byte, some error
@@ -135,17 +162,22 @@ class NodePacket(object):
 
         # next 4 bytes should be header
         pktbytes = self._serial.read(4)
-        print(''.join('{:02X} '.format(x) for x in pktbytes), end="")
+        if len(pktbytes) != 4:
+            return None
+        if self._verbose:
+            print(''.join('{:02X} '.format(x) for x in pktbytes), end="")
 
         # read in payload, if any
         if pktbytes[3] != 0:
             pktbytes += self._serial.read(pktbytes[3])
-            print(''.join('{:02X} '.format(x) for x in pktbytes), end="")
+            if self._verbose:
+                print(''.join('{:02X} '.format(x) for x in pktbytes), end="")
 
         # read in crc
         crcbyte = self._serial.read(1)[0]
         crccalc = crc8_ccitt(pktbytes)
-        print("{:02X} ".format(crcbyte), end="")
+        if self._verbose:
+            print("{:02X} ".format(crcbyte), end="")
 
         if crcbyte != crccalc:
             print("CRC mismatch: calc=0x{:02X} pkt=0x{:02X}".format(crccalc, crcbyte))
@@ -165,12 +197,75 @@ def flush_bus(serport):
     preambles = bytes([0x55] * 20)
     serport.write(preambles)
 
+def discover(serport, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 0.02
+    print("Searching for devices")
+    for addr in range(1, 17):
+        pkt = NodePacket(address=addr, command=1)
+        pkt.serport = serport
+        pkt.send()
+
+        while (True):
+            rpkt = NodePacket()
+            rpkt.serport = serport
+            rpkt = rpkt.recv()
+            if rpkt:
+                if rpkt.address == addr and rpkt.command == 1 and rpkt.reply:
+                    print("")
+                    print("{} ".format(addr), end="")
+                    break
+            else:
+                print(".", end="", flush=True)
+                break
+    print("")
+    serport.timeout = saved_timeout
+
+def bootload(serport, addr, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 0.2
+
+    print("Setting device {} into bootload mode".format(addr))
+    pkt = NodePacket(address=addr, command=2)
+    pkt.serport = serport
+    pkt.send()
+
+    # flush incoming packets before returning
+    while (True):
+        rpkt = NodePacket()
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if not rpkt:
+            break
+    serport.timeout = saved_timeout
+
 def cli():
+    # init the serial port
     ser = serial.Serial("/dev/tty.SLAB_USBtoUART", baudrate=4800)
     ser.timeout = 3
 
-    flush_bus(ser)
+    parser = argparse.ArgumentParser(description="BMS cell board utility")
+    subp = parser.add_subparsers(title="commands", dest="cmdname")
 
+    pdiscover = subp.add_parser("discover", help="Scan for devices")
+    pboot = subp.add_parser("bootload", help="Set device into bootload mode")
+    pboot.add_argument('-a', "--address", type=int, required=True, help="device address to bootload")
+    pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")
+    pdump = subp.add_parser("dump", help="Dump configuration(s)")
+    pdump.add_argument('-a', "--address", type=int, required=True, help="specific device address")
+    pdump.add_argument('-j', "--json", help="name of json file, if any")
+    pvcal = subp.add_parser("vcal", help="Voltage calibration")
+    args = parser.parse_args()
+
+    if args.cmdname == "discover":
+        flush_bus(ser)
+        discover(ser)
+
+    elif args.cmdname == "bootload":
+        flush_bus(ser)
+        bootload(ser, args.address)
+
+"""
     # ping packet
     pkt = NodePacket(address=1, command=1, reply=False)
     pkt.serport = ser
@@ -217,6 +312,7 @@ def cli():
     print(rpkt)
     print("")
 
+"""
 
 if __name__ == '__main__':
     cli()
