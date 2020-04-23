@@ -91,11 +91,15 @@ of the responding node.
 
 ### Command
 
-| ID | Command | Description                 |
-|----|---------|-----------------------------|
-|  0 | reserved| not used                    |
-|  1 | ping    | bus detection and aliveness |
-|  2 | bootload| enter boot loader mode      |
+| ID | Command | Description                       |
+|----|---------|-----------------------------------|
+|  0 | reserved| not used                          |
+|  1 | PING    | bus detection and aliveness       |
+|  2 | DFU     | enter device firmware update mode |
+|  3 | UID     | discover board unique ID (see notes in command spec)|
+|  4 | ADDR    | set board bus address             |
+
+See [Command Specification](command.md) for command details.
 
 ### Length
 

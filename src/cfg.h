@@ -22,52 +22,62 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __CMD_H__
-#define __CMD_H__
+#ifndef __CFG_H__
+#define __CFG_H__
 
 /**
- * PING command code
+ * Structure to hold the BMS Node configuration data.
  *
- * Causes a ping reply packets to be sent.
+ * @note The fields marked _(private)_ are maintained by the "cfg" module
+ * and should not be used by the client.
  */
-#define CMD_PING 1
-
-/**
- * DFU command code
- *
- * Causes the node to enter DFU (firmware update) mode.
- */
-#define CMD_DFU 2
-
-/**
- * UID command code
- *
- * Causes node to report UID and board type.
- */
-#define CMD_UID 3
-
-/**
- * ADDR command code
- *
- * Sets device bus address
- */
-#define CMD_ADDR 4
+typedef struct __attribute__ ((__packed__))
+{
+    uint8_t len;    //< (private) total length of config structure
+    uint8_t type;   //< (private) structure type/version ID
+    uint8_t addr;   //< the BMSNode bus address
+    uint8_t crc;    //< (private) structure CRC for non-volatile storage
+} config_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * Run the command processor.
+ * Get the board unique ID.
  *
- * This function should be called periodically from the main loop. It checks
- * for any available incoming packets. It checks if the packets is intended
- * for this node. If so then it dispatches the command for further processing
- * according to its function.
+ * This value is set during board production.
  *
- * @return returns `true` if a command was processed and `false` if not.
+ * @return the board unique ID as a 32-bit integer
  */
-extern bool cmd_process(void);
+extern uint32_t cfg_uid(void);
+
+/**
+ * Get the board type.
+ *
+ * This value is set during board production.
+ *
+ * @return the board type as 8-bit integer.
+ */
+extern  uint8_t cfg_board_type(void);
+
+/**
+ * Load the node configuration from persistent memory.
+ *
+ * The configuration will be read from persistent memory. If the stored
+ * configuration is not present or not valid, then defaults will be returned.
+ * The returned structure pointer will remain valid until the next call to
+ * this function.
+ *
+ * @return A pointer to a `config_t` structure that holds the node
+ * configuration.
+ */
+extern config_t *cfg_load(void);
+
+/**
+ * Stores the node configuration to persistent memory.
+ */
+extern void cfg_store(config_t *cfg);
 
 #ifdef __cplusplus
 }

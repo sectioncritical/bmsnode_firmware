@@ -37,6 +37,7 @@
 
 #include "cmd.h"
 #include "serial.h"
+#include "cfg.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -64,6 +65,9 @@
  * |  B3  |  4  | AI | reset (pulled up)                  |
  *
  */
+
+// hold global pointer to node configuration
+config_t *nodecfg;
 
 void device_init(void)
 {
@@ -150,6 +154,9 @@ int main(void)
 
     // hardware init of MCU
     device_init();
+
+    // load the node configuration
+    nodecfg = cfg_load();
 
     // enable system interrupts
     sei();

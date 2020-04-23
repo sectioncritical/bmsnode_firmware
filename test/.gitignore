@@ -1,3 +1,4 @@
 obj/
+bin/
 bmstest
 bmstest-junit.xml

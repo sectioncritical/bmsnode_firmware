@@ -1,1 +1,3 @@
+intelhex
+pyserial
 -e ../util/bmsutil

@@ -53,7 +53,7 @@ AVRDUDE_CONF?= +avrdude/t841.conf
 OUT=obj
 SRC=../src
 
-OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o
+OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o
 
 # device remains unlocked
 LOCKFUSE=0xff
@@ -80,20 +80,32 @@ help:
 	@echo "BMS Node Makefile Help"
 	@echo "======================"
 	@echo ""
+	@echo "Routine Use"
+	@echo "-----------"
 	@echo "all/(default)    - build the firmware hex file"
 	@echo "clean            - delete all build products"
 	@echo "program          - program target using avrdude/programmer"
 	@echo "upload           - upload using serial boot loader w/avrdude"
 	@echo ""
-	@echo "bootload ADDR=1 PKG=1.0.0 - bootload new firmware onto node"
+	@echo "In-system firmware update (old firmware running)"
+	@echo "-----------"
+	@echo "dfu ADDR=1 PKG=1.0.0 - bootload new firmware onto node"
 	@echo ""
+	@echo "Production and Provisioning"
+	@echo "---------------------------"
 	@echo "fuses            - program the fuses using programmer"
+	@echo "provision BOARD=oshparkv4 - provision the board info (one-time)"
 	@echo "program_boot     - program the boot loader using programmer"
-	@echo "erase            - erase the device using programmer"
+	@echo "erase            - erase the device using programmer (not usual)"
+	@echo "boardinfo        - read board provisioning info"
 	@echo ""
+	@echo "Testing"
+	@echo "-------"
 	@echo "test             - build and run the unit test"
 	@echo "cleantest        - clean the unit test"
 	@echo ""
+	@echo "Python Virtual Environment"
+	@echo "--------------------------"
 	@echo "venv             - create the python virtual environment"
 	@echo "cleanvenv        - clean the python virtual environment"
 	@echo ""
@@ -150,9 +162,9 @@ test:
 $(PKGNAME)/$(PROGNAME).hex: $(PKGNAME).tar.gz
 	tar -xvf $<
 
-.PHONY: bootload
-bootload: $(PKGNAME)/$(PROGNAME).hex venv
-	venv/bin/bmsutil bootload -a $(ADDR)
+.PHONY: dfu
+dfu: $(PKGNAME)/$(PROGNAME).hex venv
+	venv/bin/bmsutil dfu -a $(ADDR)
 	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
 
 .PHONY: discover
@@ -177,3 +189,19 @@ venv/bin/activate: requirements.txt
 .PHONY: cleanvenv
 cleanvenv:
 	rm -rf venv
+
+# PROVISIONING
+
+# generate provisioning file and write to eeprom of device
+.PHONY: provision
+provision:
+	mkdir -p provisioning
+	venv/bin/python provtool.py --write provisioning/provision.hex --board $(BOARD)
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U eeprom:w:provisioning/provision.hex:i
+
+# read provisioning info from board
+.PHONY: boardinfo
+boardinfo:
+	mkdir -p provisioning
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U eeprom:r:provisioning/eeinfo.hex:i
+	venv/bin/python provtool.py --read provisioning/eeinfo.hex

@@ -25,10 +25,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "catch.hpp"
 #include "pkt.h"
 #include "cmd.h"
+#include "cfg.h"
 #include "util/crc16.h"
 
 // we are using fast-faking-framework for provding fake functions called
@@ -44,6 +46,12 @@ extern "C" {
 FAKE_VALUE_FUNC(packet_t *, pkt_ready);
 FAKE_VOID_FUNC(pkt_rx_free, packet_t *);
 FAKE_VALUE_FUNC(bool, pkt_send, uint8_t, uint8_t, uint8_t, uint8_t *, uint8_t);
+
+FAKE_VALUE_FUNC(uint32_t, cfg_uid);
+FAKE_VALUE_FUNC(uint8_t, cfg_board_type);
+FAKE_VOID_FUNC(cfg_store, config_t *);
+
+config_t *nodecfg;
 
 }
 
@@ -61,6 +69,11 @@ FAKE_VALUE_FUNC(bool, pkt_send, uint8_t, uint8_t, uint8_t, uint8_t *, uint8_t);
 
 TEST_CASE("command processor")
 {
+    config_t testcfg = {0, 0, 0, 0};
+    // initial tests assume device is already set with address 1
+    testcfg.addr = 1;
+    nodecfg = &testcfg;
+
     // flags, addr, cmd, len, payload
     packet_t pkt_ping = { 0, 1, CMD_PING, 0 };
 
@@ -117,4 +130,238 @@ TEST_CASE("command processor")
     }
 
     // TODO: add some payload test cases
+}
+
+static uint8_t pkt_send_payload_len = 0;
+static uint8_t pkt_send_payload[64];
+
+static bool pkt_send_custom_fake(uint8_t flags, uint8_t nodeid, uint8_t cmd, uint8_t *ppld, uint8_t len)
+{
+    for (int i = 0; i < len; ++i)
+    {
+        pkt_send_payload[i] = ppld[i];
+    }
+    pkt_send_payload_len = len;
+    return pkt_send_fake.return_val;
+}
+
+TEST_CASE("UID command")
+{
+    config_t testcfg = { 0, 0, 0, 0 };
+    nodecfg = &testcfg;
+
+    RESET_FAKE(pkt_ready);
+    RESET_FAKE(pkt_send);
+    RESET_FAKE(pkt_rx_free);
+
+    RESET_FAKE(cfg_uid);
+    RESET_FAKE(cfg_board_type);
+    RESET_FAKE(cfg_store);
+
+    // reset the payload capture from pkt_send
+    memset(pkt_send_payload, 0, 64);
+    pkt_send_payload_len = 0;
+
+    pkt_send_fake.custom_fake = pkt_send_custom_fake;
+
+    SECTION("with bus address 0 and unassigned addr")
+    {
+        // packet uses addr 0 and device has addr 0
+        // should be allowed
+        packet_t pkt = { 0, 0, CMD_UID, 0 };
+        pkt_ready_fake.return_val = &pkt;
+        pkt_send_fake.return_val = true;
+
+        // this cmd is going to call cfg_uid() and cfg_board_type()
+        cfg_uid_fake.return_val = 0xab563412;
+        cfg_board_type_fake.return_val = 1;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called cfg_uid() or cfg_board_type()
+        CHECK(cfg_uid_fake.call_count == 1);
+        CHECK(cfg_board_type_fake.call_count == 1);
+
+        // check UID reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 0);
+        CHECK(pkt_send_fake.arg2_val == CMD_UID);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 5);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload[0] == 0x12);
+        CHECK(pkt_send_payload[1] == 0x34);
+        CHECK(pkt_send_payload[2] == 0x56);
+        CHECK(pkt_send_payload[3] == 0xab);
+        CHECK(pkt_send_payload[4] == 1);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+
+    SECTION("with bus address 1 and assigned addr 1")
+    {
+        // packet uses addr 1 and device has addr 1
+        // should be allowed
+        testcfg.addr = 1; // device addr 1
+
+        packet_t pkt = { 0, 1, CMD_UID, 0 }; // pkt addr 1
+        pkt_ready_fake.return_val = &pkt;
+        pkt_send_fake.return_val = true;
+
+        // this cmd is going to call cfg_uid() and cfg_board_type()
+        cfg_uid_fake.return_val = 0xab563412;
+        cfg_board_type_fake.return_val = 1;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called cfg_uid() or cfg_board_type()
+        CHECK(cfg_uid_fake.call_count == 1);
+        CHECK(cfg_board_type_fake.call_count == 1);
+
+        // check UID reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
+        CHECK(pkt_send_fake.arg2_val == CMD_UID);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 5);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload[0] == 0x12);
+        CHECK(pkt_send_payload[1] == 0x34);
+        CHECK(pkt_send_payload[2] == 0x56);
+        CHECK(pkt_send_payload[3] == 0xab);
+        CHECK(pkt_send_payload[4] == 1);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+
+    SECTION("with bus address 1 and unassigned addr")
+    {
+        // packet uses addr 1 but device has no address assigned
+        // should not reply
+        packet_t pkt = { 0, 1, CMD_UID, 0 };
+        pkt_ready_fake.return_val = &pkt;
+        pkt_send_fake.return_val = true;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK_FALSE(ret);
+
+        // should not have called cfg_uid() or cfg_board_type()
+        CHECK_FALSE(cfg_uid_fake.call_count);
+        CHECK_FALSE(cfg_board_type_fake.call_count);
+
+        // should not call pkt_send
+        CHECK_FALSE(pkt_send_fake.call_count);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+
+    SECTION("with bus address 0 and assigned addr 1")
+    {
+        // packet uses addr 0 but device has assigned address 1
+        // should not reply
+        testcfg.addr = 1; // assigned address 1
+
+        packet_t pkt = { 0, 0, CMD_UID, 0 }; // pkt address 0
+        pkt_ready_fake.return_val = &pkt;
+        pkt_send_fake.return_val = true;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK_FALSE(ret);
+
+        // should not have called cfg_uid() or cfg_board_type()
+        CHECK_FALSE(cfg_uid_fake.call_count);
+        CHECK_FALSE(cfg_board_type_fake.call_count);
+
+        // should not call pkt_send
+        CHECK_FALSE(pkt_send_fake.call_count);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+}
+
+TEST_CASE("ADDR command")
+{
+    config_t testcfg = { 0, 0, 0, 0 };
+    nodecfg = &testcfg;
+
+    RESET_FAKE(pkt_ready);
+    RESET_FAKE(pkt_send);
+    RESET_FAKE(pkt_rx_free);
+
+    RESET_FAKE(cfg_uid);
+    RESET_FAKE(cfg_board_type);
+    RESET_FAKE(cfg_store);
+
+    pkt_send_fake.custom_fake = pkt_send_custom_fake;
+
+    // reset the payload capture from pkt_send
+    memset(pkt_send_payload, 0, 64);
+    pkt_send_payload_len = 0;
+
+    SECTION("assign addr for unassigned node")
+    {
+        // device has unassigned addr (0)
+        // packet uses 1 to assign addr 1 to the node
+        // packet payload should match UID of device
+        packet_t pkt = { 0, 1, CMD_ADDR, 4, { 0x12, 0x34, 0x56, 0xAB } };
+        pkt_ready_fake.return_val = &pkt;
+        pkt_send_fake.return_val = true;
+
+        // this cmd is going to call cfg_uid()
+        cfg_uid_fake.return_val = 0xab563412;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called cfg_uid()
+        CHECK(cfg_uid_fake.call_count == 1);
+
+        // should have set the node address to 1
+        CHECK(testcfg.addr == 1);
+
+        // check UID reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // addr
+        CHECK(pkt_send_fake.arg2_val == CMD_ADDR);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 4);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload[0] == 0x12);
+        CHECK(pkt_send_payload[1] == 0x34);
+        CHECK(pkt_send_payload[2] == 0x56);
+        CHECK(pkt_send_payload[3] == 0xab);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
 }

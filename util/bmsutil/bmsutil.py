@@ -2,7 +2,7 @@
 
 import serial
 import argparse
-# from crccheck.crc import Crc8Itu
+import re
 
 def crc8_ccitt(pktbytes):
     crc = 0
@@ -203,16 +203,18 @@ def discover(serport, verbose=False):
     print("Searching for devices")
     for addr in range(1, 17):
         pkt = NodePacket(address=addr, command=1)
+        pkt.verbose = verbose
         pkt.serport = serport
         pkt.send()
 
         while (True):
             rpkt = NodePacket()
+            rpkt.verbose = verbose
             rpkt.serport = serport
             rpkt = rpkt.recv()
             if rpkt:
                 if rpkt.address == addr and rpkt.command == 1 and rpkt.reply:
-                    print("")
+                    # print("")
                     print("{} ".format(addr), end="")
                     break
             else:
@@ -221,11 +223,11 @@ def discover(serport, verbose=False):
     print("")
     serport.timeout = saved_timeout
 
-def bootload(serport, addr, verbose=False):
+def dfu(serport, addr, verbose=False):
     saved_timeout = serport.timeout
     serport.timeout = 0.2
 
-    print("Setting device {} into bootload mode".format(addr))
+    print("Setting device {} into DFU mode".format(addr))
     pkt = NodePacket(address=addr, command=2)
     pkt.serport = serport
     pkt.send()
@@ -239,32 +241,124 @@ def bootload(serport, addr, verbose=False):
             break
     serport.timeout = saved_timeout
 
+_board_types = ["unkown", "oshparkv4", "stuartv42"]
+
+def uid(serport, addr, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    pkt = NodePacket(address=addr, command=3)
+    pkt.serport = serport
+    pkt.verbose = verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 3 and rpkt.reply:
+                uid = rpkt.payload[0:4]
+                uidstr = '-'.join(format(x, "02X") for x in uid)
+                print("")
+                boardnum = rpkt.payload[4]
+                boardstr = _board_types[boardnum] if boardnum <= len(_board_types) else "invalid"
+                print("board type: {}".format(boardstr))
+                print("device address: {} / UID: {}".format(addr, uidstr))
+                print("")
+                break
+        else:
+            print("no reply")
+            break
+
+    print("")
+    serport.timeout = saved_timeout
+
+def setaddr(serport, addr, uid, verbose=False):
+    # validate the UID format first
+    r = re.compile("^[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}$")
+    if not r.match(uid):
+        print("Improperly formatted UID string. Should be like '12-34-56-AB'")
+        return
+
+    # get rid of dashes so we can convert to bytes
+    uidstr = uid.replace('-', ' ')
+    uidbytes = bytes.fromhex(uidstr)
+
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    pkt = NodePacket(address=addr, command=4, payload=list(uidbytes))
+    pkt.serport = serport
+    pkt.verbose= verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 4 and rpkt.reply:
+                uid = rpkt.payload
+                uidstr = '-'.join(format(x, "02X") for x in uid)
+                print("")
+                print("device address: {} set for UID: {}".format(addr, uidstr))
+                print("")
+                break
+        else:
+            print("no reply")
+            break
+    serport.timeout = saved_timeout
+
 def cli():
     # init the serial port
     ser = serial.Serial("/dev/tty.SLAB_USBtoUART", baudrate=4800)
     ser.timeout = 3
 
     parser = argparse.ArgumentParser(description="BMS cell board utility")
+    parser.add_argument('-v', "--verbose", action="store_true",
+                        help="turn on some debug output")
     subp = parser.add_subparsers(title="commands", dest="cmdname")
 
     pdiscover = subp.add_parser("discover", help="Scan for devices")
-    pboot = subp.add_parser("bootload", help="Set device into bootload mode")
+
+    pboot = subp.add_parser("dfu", help="Set device into DFU mode")
     pboot.add_argument('-a', "--address", type=int, required=True, help="device address to bootload")
-    pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")
-    pdump = subp.add_parser("dump", help="Dump configuration(s)")
-    pdump.add_argument('-a', "--address", type=int, required=True, help="specific device address")
-    pdump.add_argument('-j', "--json", help="name of json file, if any")
-    pvcal = subp.add_parser("vcal", help="Voltage calibration")
+
+    puid = subp.add_parser("uid", help="Get device UID")
+    puid.add_argument('-a', "--address", type=int, default=0, help="device address to query (0)")
+
+    paddr = subp.add_parser("addr", help="Set device address")
+    paddr.add_argument('-a', "--address", type=int, required=True, help="new bus address for device")
+    paddr.add_argument('-u', "--uid", type=str, required=True, help="UID of device to set")
+
     args = parser.parse_args()
 
     if args.cmdname == "discover":
         flush_bus(ser)
         discover(ser)
 
-    elif args.cmdname == "bootload":
+    elif args.cmdname == "dfu":
         flush_bus(ser)
-        bootload(ser, args.address)
+        dfu(ser, args.address)
 
+    elif args.cmdname == "uid":
+        flush_bus(ser)
+        uid(ser, args.address, verbose=args.verbose)
+
+    elif args.cmdname == "addr":
+        flush_bus(ser)
+        setaddr(ser, args.address, args.uid, verbose=args.verbose)
+
+"""
+    pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")
+    pdump = subp.add_parser("dump", help="Dump configuration(s)")
+    pdump.add_argument('-a', "--address", type=int, required=True, help="specific device address")
+    pdump.add_argument('-j', "--json", help="name of json file, if any")
+    pvcal = subp.add_parser("vcal", help="Voltage calibration")
+"""
 """
     # ping packet
     pkt = NodePacket(address=1, command=1, reply=False)

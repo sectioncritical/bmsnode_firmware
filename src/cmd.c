@@ -31,7 +31,7 @@
 
 #include "pkt.h"
 #include "cmd.h"
-
+#include "cfg.h"
 
 //////////
 //
@@ -39,19 +39,29 @@
 //
 //////////
 
-// hard code a node id for now
-static uint8_t nodeid = 1;
+// global node configuration
+// this is assumed to be set to non-NULL in main before anything
+// else runs
+extern config_t *nodecfg;
+
+#define NODEID (nodecfg->addr)
+
+typedef union
+{
+    uint32_t u32;
+    uint8_t u8[4];
+} u32buf_t;
 
 static void(*swreset)(void) = 0;
 
 // implement PING command
-static bool cmd_ping(packet_t *pkt)
+static bool cmd_ping(void)
 {
-    return pkt_send(PKT_FLAG_REPLY, pkt->addr, pkt->cmd, NULL, 0);
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_PING, NULL, 0);
 }
 
-// implement BOOTLOAD command
-static bool cmd_bootload(packet_t *pkt)
+// implement DFU command
+static bool cmd_dfu(void)
 {
     // TODO: put IO pins in safe state
     // TODO: should it send a reply? then it will need to wait until
@@ -63,24 +73,80 @@ static bool cmd_bootload(packet_t *pkt)
     return false;
 }
 
+// implement UID command
+static bool cmd_uid(void)
+{
+    uint8_t pld[5];
+    u32buf_t uid;
+    uid.u32 = cfg_uid();
+    pld[0] = uid.u8[0];
+    pld[1] = uid.u8[1];
+    pld[2] = uid.u8[2];
+    pld[3] = uid.u8[3];
+    pld[4] = cfg_board_type();
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_UID, pld, 5);
+}
+
+// implement ADDR command
+static bool cmd_addr(packet_t *pkt)
+{
+    uint32_t uid = cfg_uid();
+    u32buf_t pktuid;
+    pktuid.u8[0] = pkt->payload[0];
+    pktuid.u8[1] = pkt->payload[1];
+    pktuid.u8[2] = pkt->payload[2];
+    pktuid.u8[3] = pkt->payload[3];
+    // compare UID in packet to our UID
+    if (uid == pktuid.u32)
+    {
+        // if the same, then update our address and store it
+        nodecfg->addr = pkt->addr;
+        cfg_store(nodecfg);
+        return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADDR, pkt->payload, 4);
+    }
+    // only send reply if the UID matches
+    return false;
+}
+
 // run command processor
 bool cmd_process(void)
 {
     bool ret = false;
     packet_t *pkt = pkt_ready();
 
+    // valid packet
     if (pkt)
     {
-        if (pkt->addr == nodeid)
+        // process ADDR command for any address
+        if (pkt->cmd == CMD_ADDR)
+        {
+            ret = cmd_addr(pkt);
+        }
+        // special handling if our nodeid is not set
+        else if (NODEID == 0)
+        {
+            // if UID command with addr==0 and we have no nodeid assigned
+            if ((pkt->addr == 0) && (pkt->cmd == CMD_UID))
+            {
+                // we can respond to address 0 in this case
+                ret = cmd_uid();
+            }
+        }
+        // we have a nodeid so process normally
+        else if (pkt->addr == NODEID)
         {
             switch (pkt->cmd)
             {
                 case CMD_PING:
-                    ret = cmd_ping(pkt);
+                    ret = cmd_ping();
                     break;
 
-                case CMD_BOOTLOAD:
-                    ret = cmd_bootload(pkt);
+                case CMD_DFU:
+                    ret = cmd_dfu();
+                    break;
+
+                case CMD_UID:
+                    ret = cmd_uid();
                     break;
 
                 default:
