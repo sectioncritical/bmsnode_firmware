@@ -39,8 +39,8 @@
 #define CFG_ADDR ((void *)0)
 
 // where the board data is stored in EEPROM
-#define CFG_ADDR_UID ((void *)0x200-4)
-#define CFG_ADDR_BOARD_TYPE ((void *)0x200-5)
+#define CFG_ADDR_UID ((void *)(0x200-4))
+#define CFG_ADDR_BOARD_TYPE ((void *)(0x200-5))
 
 // compute crc of a configuration block
 // this assumes that the length field is correct

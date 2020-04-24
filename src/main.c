@@ -38,6 +38,7 @@
 #include "cmd.h"
 #include "serial.h"
 #include "cfg.h"
+#include "pkt.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -157,6 +158,9 @@ int main(void)
 
     // load the node configuration
     nodecfg = cfg_load();
+
+    pkt_reset(); // init packet parser
+    ser_flush(); // init serial module
 
     // enable system interrupts
     sei();
