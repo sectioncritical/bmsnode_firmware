@@ -235,7 +235,7 @@ power level while shunting is in effect, and not necessary to stay in a low
 power mode.
 
 - FR.1 - firmware design shall be such that the BMSNode is using the lowest
-  amount of power practicable for the requied function
+  amount of power practicable for the required function
 - FR.2 - during the mode of lowest functionality, when no actions are required
   the firmware shall place the MCU in the lowest possible power mode
 - FR.3 - during shunting operation, low power is not required
@@ -363,16 +363,17 @@ adding units of functionality. Each milestone release shall be considered a
 production firmware release (even if it does not have final feature set), and
 is subject to the release process and release testing.
 
-|Milestone|Description                       |
-|---------|----------------------------------|
+|Milestone|Description                                              |
+|---------|---------------------------------------------------------|
 |   0.0   |Protocol implemented with minimal functionality. Can process commands and send a report|
-|   0.1   |In-system firmware update         |
-|   0.2   |Parameters updating and reporting |
-|   0.3   |Address provisioning              |
-|   0.4   |Voltage and temperature reporting |
-|   0.5   |Manual shunt mode                 |
-|   0.6   |Automatic shunt mode              |
-|   0.7   |Additional features               |
-|   0.8   |Feature refinement                |
-|   1.0   |First production release          |
+|   0.1   |In-system firmware update                                |
+|   0.2   |Parameters storage, unique ID and address provisioning   |
+|   0.3   |Release process, firmware versioning and reporting       |
+|   0.4   |Power saving mode                                        |
+|   0.5   |Voltage and temperature reporting                        |
+|   0.6   |Manual shunt mode                                        |
+|   0.7   |Automatic shunt mode                                     |
+|   0.8   |Additional features                                      |
+|   0.9   |Feature refinement                                       |
+|   1.0   |First production release                                 |
 
