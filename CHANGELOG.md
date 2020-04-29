@@ -4,6 +4,19 @@
 
 <!--- next entry here -->
 
+## 0.3.0
+2020-04-29
+
+### Features
+
+- **build:** add release packaging and versioning #18 (cc9c6b3544e40e8a5be24620d4a3374198bf4e64)
+- **cmd:** add fw version to UID command #17 (3d1663961c50007f55c873aacab98826a602131f)
+- **build:** add CI tagging and release #18 (e0b63b7c746175e6f31f3b0f81bf19771873581e)
+
+### Fixes
+
+- **req:** update milestones [skip ci] (011ead185ef31a4277324eb71beb7295316c333b)
+
 ## 0.2.0
 2020-04-23
 
