@@ -313,8 +313,7 @@ ci-status:
 
 # versioning tool must be run from top level project directory (where .git is)
 .PHONY: release
-release:
-	cat ../CHANGELOG.md
+release: changelog
 	cd $(PROJ_DIR); $(VERTOOL) tag-and-commit CHANGELOG.md
 	RELEASE_VERSION=$$(<$(BUILD_DIR)/next-version); \
 	ARTIFACT=$$(realpath --relative-to $(PROJ_DIR) $(BUILD_DIR))/bmsnode-$$RELEASE_VERSION.tar.gz; \
