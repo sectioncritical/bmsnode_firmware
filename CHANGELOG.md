@@ -4,6 +4,13 @@
 
 <!--- next entry here -->
 
+## 0.3.1
+2020-04-29
+
+### Fixes
+
+- **build:** fix release artifact, add build log #18 (0fe50ed1eeaeae2afe36234e6327d247a9e65f69)
+
 ## 0.3.0
 2020-04-29
 
