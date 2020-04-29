@@ -63,6 +63,7 @@ OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o $(OUT)
 # with full paths.
 BUILD_DIR=$(shell pwd)
 PROJ_DIR=$(shell cd ..; pwd)
+BUILDLOG=buildlog.txt
 
 # device remains unlocked
 LOCKFUSE=0xff
@@ -150,20 +151,23 @@ $(OUT):
 
 $(OUT)/%.o: $(SRC)/%.c $(OUT) $(BUILD_DIR)/next-version
 	$(eval VERSTR=$(shell cat $(BUILD_DIR)/next-version | tr '.' ','))
-	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $<
+	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $< 2>&1 | tee -a $(BUILDLOG)
 
 $(ELFFILE): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS) 2>&1 | tee -a $(BUILDLOG)
+	echo "Commit used for building:" 2>&1 | tee -a $(BUILDLOG)
+	git rev-parse HEAD 2>&1 | tee -a $(BUILDLOG)
 
 $(HEXFILE): $(ELFFILE)
-	$(OBJCOPY) -O ihex -R .eeprom $< $@
-	$(SIZE) $<
+	$(OBJCOPY) -O ihex -R .eeprom $< $@ 2>&1 | tee -a $(BUILDLOG)
+	$(SIZE) $< 2>&1 | tee -a $(BUILDLOG)
 
 .PHONY: clean
 clean:
 	rm -rf $(OUT)
 	rm -rf package
 	rm -f next-version
+	rm -f $(BUILDLOG)
 
 # flash the firmware onto the target
 .PHONY: program
@@ -282,7 +286,7 @@ $(BUILD_DIR)/next-version: $(VERTOOL)
 	cat $@
 
 .PHONY: changelog
-changelog:
+changelog: $(VERTOOL)
 	git checkout -- ../CHANGELOG.md
 	-cd $(PROJ_DIR); $(VERTOOL) changelog -f CHANGELOG.md
 	-cat $(PROJ_DIR)/CHANGELOG.md
@@ -306,3 +310,13 @@ ci-status:
 	-cd $(CI_PROJECT_DIR); $(VERTOOL) test-git
 	cd $(CI_PROJECT_DIR); $(VERTOOL) test-api
 	cd $(CI_PROJECT_DIR); git status
+
+# versioning tool must be run from top level project directory (where .git is)
+.PHONY: release
+release:
+	cat ../CHANGELOG.md
+	cd $(PROJ_DIR); $(VERTOOL) tag-and-commit CHANGELOG.md
+	RELEASE_VERSION=$$(<$(BUILD_DIR)/next-version); \
+	ARTIFACT=$$(realpath --relative-to $(PROJ_DIR) $(BUILD_DIR))/bmsnode-$$RELEASE_VERSION.tar.gz; \
+	cd $(PROJ_DIR); echo $$ARTIFACT; \
+	$(VERTOOL) --ci-commit-tag v$$RELEASE_VERSION add-download -f $$ARTIFACT -d "BMSNode Firmware Release Package"

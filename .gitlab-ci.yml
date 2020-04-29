@@ -13,10 +13,11 @@ variables:
 cache:
     paths:
         - $PIP_CACHE_DIR
-#    - $BUILD_DIR/vertool
-#    - $BUILD_DIR/venv
+        - $BUILD_DIR/vertool
+        - $BUILD_DIR/venv
+        - $TEST_DIR/venv
 
-build:
+devbuild:
     stage: build
     rules:
         - if: '$CI_COMMIT_BRANCH != "master"'
@@ -30,7 +31,7 @@ build:
             - "doc/license-badge.svg"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
 
-buildprod:
+build:
     stage: build
     rules:
         - if: '$CI_COMMIT_BRANCH == "master"'
@@ -58,3 +59,12 @@ test:
             - "$TEST_DIR/reports/check/*.html"
         reports:
             junit: "$TEST_DIR/reports/bmstest-junit.xml"
+
+release:
+    stage: release
+    rules:
+        - if: '$CI_COMMIT_BRANCH == "master"'
+          when: manual
+    script:
+        - "make -C $BUILD_DIR ci-status"
+        - "make -C $BUILD_DIR release"
