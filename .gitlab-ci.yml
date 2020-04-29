@@ -18,15 +18,31 @@ cache:
 
 build:
     stage: build
-    except:
-        - tags
+    rules:
+        - if: '$CI_COMMIT_BRANCH != "master"'
+          when: always
     script:
         - "make -C $BUILD_DIR clean"
-        - "make -C $BUILD_DIR"
+        - "make -C $BUILD_DIR package"
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
             - "doc/license-badge.svg"
+            - "$BUILD_DIR/bmsnode-*.tar.gz"
+
+buildprod:
+    stage: build
+    rules:
+        - if: '$CI_COMMIT_BRANCH == "master"'
+          when: always
+    script:
+        - "make -C $BUILD_DIR clean"
+        - "make -C $BUILD_DIR package PRODUCTION=1"
+    artifacts:
+        paths:
+            - "$BUILD_DIR/obj/bmsnode.*"
+            - "doc/license-badge.svg"
+            - "$BUILD_DIR/bmsnode-*.tar.gz"
 
 test:
     stage: test

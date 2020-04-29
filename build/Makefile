@@ -20,6 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# using bashisms
+SHELL=/bin/bash
+
 PROGNAME=bmsnode
 
 # name of package for updating
@@ -54,6 +57,12 @@ OUT=obj
 SRC=../src
 
 OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o
+
+# to run the versioning tool we need to switch around to different
+# directories. So it is handy to be able to refer to directopries and files
+# with full paths.
+BUILD_DIR=$(shell pwd)
+PROJ_DIR=$(shell cd ..; pwd)
 
 # device remains unlocked
 LOCKFUSE=0xff
@@ -99,15 +108,34 @@ help:
 	@echo "erase            - erase the device using programmer (not usual)"
 	@echo "boardinfo        - read board provisioning info"
 	@echo ""
+	@echo "Release and Packaging"
+	@echo "---------------------"
+	@echo "package PRODUCTION=1 - create release package with release versioning"
+	@echo "package              - create release package with dev versioning (0.0.0)"
+	@echo "nextver              - generate next version (done by package)"
+	@echo "changelog            - generate the CHANGELOG file (done by package)"
+	@echo ""
 	@echo "Testing"
 	@echo "-------"
 	@echo "test             - build and run the unit test"
 	@echo "cleantest        - clean the unit test"
+	@echo "(see also the Makefile in the test subdir)"
 	@echo ""
 	@echo "Python Virtual Environment"
 	@echo "--------------------------"
 	@echo "venv             - create the python virtual environment"
 	@echo "cleanvenv        - clean the python virtual environment"
+	@echo ""
+	@echo "NOTES"
+	@echo "-----"
+	@echo "* 'make clean' then 'make package' will build everything"
+	@echo "* use 'PRODUCTION=1' to generate version number, otherwise"
+	@echo "  the version will be 0.0.0"
+	@echo "* 'make changelog' can be used to see what the generated CHANGELOG"
+	@echo "  will look like. However this is done automatically for package."
+	@echo "  Also, CHANGELOG may be updated every time 'changelog' or 'package'"
+	@echo "  target is run, so be sure that CHANGELOG.md is clean before"
+	@echo "  generating it for a real release."
 	@echo ""
 
 CC=avr-gcc
@@ -133,6 +161,8 @@ $(HEXFILE): $(ELFFILE)
 .PHONY: clean
 clean:
 	rm -rf $(OUT)
+	rm -rf package
+	rm -f next-version
 
 # flash the firmware onto the target
 .PHONY: program
@@ -190,7 +220,8 @@ venv/bin/activate: requirements.txt
 cleanvenv:
 	rm -rf venv
 
-# PROVISIONING
+######################
+#### PROVISIONING ####
 
 # generate provisioning file and write to eeprom of device
 .PHONY: provision
@@ -205,3 +236,72 @@ boardinfo:
 	mkdir -p provisioning
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U eeprom:r:provisioning/eeinfo.hex:i
 	venv/bin/python provtool.py --read provisioning/eeinfo.hex
+
+###################
+#### RELEASING ####
+
+# tool is originally called "release" but that is a little common so rename
+# it to "vertool"
+VERTOOL:=$(BUILD_DIR)/vertool
+
+# versioning tool expects certain GitLab CI environment variables to be
+# defined. They will already be in the environment if this is run from CI.
+# But to run locally they must be defined. These will be overridden if
+# run from CI
+CI_PROJECT_DIR?=$(PROJ_DIR)
+CI_COMMIT_REF_NAME?=$(shell git rev-parse --abbrev-ref HEAD)
+CI_COMMIT_REF_SLUG?=$(subst /,-,$(CI_COMMIT_REF_NAME))
+CI_PIPELINE_IID?=0
+export CI_COMMIT_REF_NAME
+export CI_COMMIT_REF_SLUG
+export CI_PIPELINE_IID
+
+# get the release versioning tool
+# we are downloading for now because it is a little large to put in repo
+# plus, we need different binary depending on OS
+ifeq ($(shell uname),Darwin)
+    VERTOOL_URL:=https://juhani.gitlab.io/go-semrel-gitlab/download/v0.21.1/darwin/release
+endif
+ifeq ($(shell uname),Linux)
+    VERTOOL_URL:=https://juhani.gitlab.io/go-semrel-gitlab/download/v0.21.1/release
+endif
+
+$(VERTOOL):
+	curl --output $@ $(VERTOOL_URL)
+	chmod +x $@
+
+vertool: $(VERTOOL)
+
+.PHONY: nextver
+nextver: $(BUILD_DIR)/next-version
+
+$(BUILD_DIR)/next-version: $(VERTOOL)
+	if [ -z "$$PRODUCTION" ] ; then echo "0.0.0" > $@; else \
+	cd $(PROJ_DIR); $(VERTOOL) next-version --allow-current > $@; fi
+	cat $@
+
+.PHONY: changelog
+changelog:
+	git checkout -- ../CHANGELOG.md
+	-cd $(PROJ_DIR); $(VERTOOL) changelog -f CHANGELOG.md
+	-cat $(PROJ_DIR)/CHANGELOG.md
+
+.PHONY: package
+package: $(HEXFILE) nextver changelog
+	rm -rf package
+	mkdir -p package
+	cp $(HEXFILE) package/.
+	cp $(ELFFILE) package/.
+	cp $(OUT)/$(PROGNAME).map package/.
+	cp $(PROJ_DIR)/CHANGELOG.md package/.
+	RELVER=$$(<$(BUILD_DIR)/next-version); echo $$RELVER; \
+	PKGNAME=$(PROGNAME)-$$RELVER; rm -rf $$PKGNAME; \
+	mv package $$PKGNAME; \
+	tar -zcvf $$PKGNAME.tar.gz $$PKGNAME/*
+
+.PHONY: ci-status
+ci-status:
+	cd $(CI_PROJECT_DIR); $(VERTOOL) --version
+	-cd $(CI_PROJECT_DIR); $(VERTOOL) test-git
+	cd $(CI_PROJECT_DIR); $(VERTOOL) test-api
+	cd $(CI_PROJECT_DIR); git status
