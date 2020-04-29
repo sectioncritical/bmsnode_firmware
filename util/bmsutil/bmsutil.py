@@ -123,7 +123,7 @@ class NodePacket(object):
         presync = [ 0x55, 0x55, 0x55, 0x55, 0xF0 ]
         packet = bytes(presync + packet)
         if self._verbose:
-            print("SENDING", ''.join('{:02X} '.format(x) for x in packet))
+            print("SEND", ''.join('{:02X} '.format(x) for x in packet))
         self._serial.write(packet)
 
     # TODO: need to rewrite as state machine with singe byte read at top
@@ -177,7 +177,7 @@ class NodePacket(object):
         crcbyte = self._serial.read(1)[0]
         crccalc = crc8_ccitt(pktbytes)
         if self._verbose:
-            print("{:02X} ".format(crcbyte), end="")
+            print("{:02X} ".format(crcbyte))
 
         if crcbyte != crccalc:
             print("CRC mismatch: calc=0x{:02X} pkt=0x{:02X}".format(crccalc, crcbyte))
@@ -266,6 +266,8 @@ def uid(serport, addr, verbose=False):
                 boardstr = _board_types[boardnum] if boardnum <= len(_board_types) else "invalid"
                 print("board type: {}".format(boardstr))
                 print("device address: {} / UID: {}".format(addr, uidstr))
+                verbytes = rpkt.payload[5:8]
+                print("firmware version: {}.{}.{}".format(verbytes[0], verbytes[1], verbytes[2]))
                 print("")
                 break
         else:
@@ -338,7 +340,7 @@ def cli():
 
     if args.cmdname == "discover":
         flush_bus(ser)
-        discover(ser)
+        discover(ser, verbose=args.verbose)
 
     elif args.cmdname == "dfu":
         flush_bus(ser)

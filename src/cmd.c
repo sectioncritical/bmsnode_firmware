@@ -32,6 +32,7 @@
 #include "pkt.h"
 #include "cmd.h"
 #include "cfg.h"
+#include "ver.h"
 
 //////////
 //
@@ -76,7 +77,7 @@ static bool cmd_dfu(void)
 // implement UID command
 static bool cmd_uid(void)
 {
-    uint8_t pld[5];
+    uint8_t pld[8];
     u32buf_t uid;
     uid.u32 = cfg_uid();
     pld[0] = uid.u8[0];
@@ -84,7 +85,10 @@ static bool cmd_uid(void)
     pld[2] = uid.u8[2];
     pld[3] = uid.u8[3];
     pld[4] = cfg_board_type();
-    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_UID, pld, 5);
+    pld[5] = g_version[0];
+    pld[6] = g_version[1];
+    pld[7] = g_version[2];
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_UID, pld, 8);
 }
 
 // implement ADDR command

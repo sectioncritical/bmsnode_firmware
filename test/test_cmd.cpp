@@ -31,6 +31,7 @@
 #include "pkt.h"
 #include "cmd.h"
 #include "cfg.h"
+#include "ver.h"
 #include "util/crc16.h"
 
 // we are using fast-faking-framework for provding fake functions called
@@ -164,6 +165,10 @@ TEST_CASE("UID command")
 
     pkt_send_fake.custom_fake = pkt_send_custom_fake;
 
+    // the firmware version is stored in g_version and is set at build
+    // time. The test Makefile sets it to 4.9.94 so that is the value to
+    // check when we expect fw version
+
     SECTION("with bus address 0 and unassigned addr")
     {
         // packet uses addr 0 and device has addr 0
@@ -191,15 +196,18 @@ TEST_CASE("UID command")
         CHECK(pkt_send_fake.arg1_val == 0);
         CHECK(pkt_send_fake.arg2_val == CMD_UID);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 5);
+        CHECK(pkt_send_fake.arg4_val == 8);
 
         // check payload
-        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload_len == 8);
         CHECK(pkt_send_payload[0] == 0x12);
         CHECK(pkt_send_payload[1] == 0x34);
         CHECK(pkt_send_payload[2] == 0x56);
         CHECK(pkt_send_payload[3] == 0xab);
         CHECK(pkt_send_payload[4] == 1);
+        CHECK(pkt_send_payload[5] == 4);
+        CHECK(pkt_send_payload[6] == 9);
+        CHECK(pkt_send_payload[7] == 94);
 
         // verify pkt_rx_free() was called
         CHECK(pkt_rx_free_fake.call_count == 1);
@@ -235,15 +243,18 @@ TEST_CASE("UID command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_UID);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 5);
+        CHECK(pkt_send_fake.arg4_val == 8);
 
         // check payload
-        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload_len == 8);
         CHECK(pkt_send_payload[0] == 0x12);
         CHECK(pkt_send_payload[1] == 0x34);
         CHECK(pkt_send_payload[2] == 0x56);
         CHECK(pkt_send_payload[3] == 0xab);
         CHECK(pkt_send_payload[4] == 1);
+        CHECK(pkt_send_payload[5] == 4);
+        CHECK(pkt_send_payload[6] == 9);
+        CHECK(pkt_send_payload[7] == 94);
 
         // verify pkt_rx_free() was called
         CHECK(pkt_rx_free_fake.call_count == 1);

@@ -77,14 +77,17 @@ With reply bit:
 |Byte    |Usage                      |
 |--------|---------------------------|
 |CMD     | 3                         |
-|LEN     | 5                         |
+|LEN     | 8                         |
 |PLD[0:3]| 32-bit UID, little-endian |
 |PLD[4]  | board type                |
+|PLD[5]  | firmware major version    |
+|PLD[6]  | firmware minor version    |
+|PLD[7]  | firmware patch version    |
 
 ### Description
 
 The UID command is used to discover the unique ID (UID) for a board. It also
-returns the board type.
+returns the board type and the firmware version.
 
 **Board Types**
 

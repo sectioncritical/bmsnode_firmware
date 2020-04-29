@@ -56,7 +56,7 @@ AVRDUDE_CONF?= +avrdude/t841.conf
 OUT=obj
 SRC=../src
 
-OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o
+OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o $(OUT)/ver.o
 
 # to run the versioning tool we need to switch around to different
 # directories. So it is handy to be able to refer to directopries and files
@@ -148,8 +148,9 @@ LDFLAGS=-Wl,-Map,$(OUT)/$(PROGNAME).map -Wl,--gc-sections -fuse-linker-plugin
 $(OUT):
 	mkdir -p $(OUT)
 
-$(OUT)/%.o: $(SRC)/%.c $(OUT)
-	$(CC) $(CFLAGS) -o $@  -c $<
+$(OUT)/%.o: $(SRC)/%.c $(OUT) $(BUILD_DIR)/next-version
+	$(eval VERSTR=$(shell cat $(BUILD_DIR)/next-version | tr '.' ','))
+	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $<
 
 $(ELFFILE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS)

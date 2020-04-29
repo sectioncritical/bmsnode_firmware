@@ -32,7 +32,7 @@ TESTS=bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg
 
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
 SER_OBJS=test_main.o test_serial.o serial.o io.o
-CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o
+CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o ver.o
 CFG_OBJS=test_main.o test_cfg.o cfg.o crc16.o
 
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
@@ -46,7 +46,7 @@ REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
 CC=gcc
 CXX=g++
 
-CFLAGS=-std=c99 -O0 --coverage -Werror -Wall -DUNIT_TEST
+CFLAGS=-std=c99 -O0 --coverage -Werror -Wall -DUNIT_TEST -DFWVERSION="{4,9,94}"
 CXXFLAGS=-g -std=c++11 -O0 -Werror -Wall
 
 LDFLAGS=--coverage

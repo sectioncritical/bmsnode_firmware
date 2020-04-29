@@ -2,3 +2,4 @@ obj/
 provisioning/
 vertool
 next-version
+*.tar.gz
