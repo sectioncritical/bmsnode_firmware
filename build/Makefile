@@ -115,6 +115,7 @@ help:
 	@echo "package              - create release package with dev versioning (0.0.0)"
 	@echo "nextver              - generate next version (done by package)"
 	@echo "changelog            - generate the CHANGELOG file (done by package)"
+	@echo "release              - tag release (used by gitlab CI, not local)"
 	@echo ""
 	@echo "Testing"
 	@echo "-------"
@@ -149,17 +150,17 @@ LDFLAGS=-Wl,-Map,$(OUT)/$(PROGNAME).map -Wl,--gc-sections -fuse-linker-plugin
 $(OUT):
 	mkdir -p $(OUT)
 
-$(OUT)/%.o: $(SRC)/%.c $(OUT) $(BUILD_DIR)/next-version
+$(OUT)/%.o: $(SRC)/%.c $(BUILD_DIR)/next-version | $(OUT)
 	$(eval VERSTR=$(shell cat $(BUILD_DIR)/next-version | tr '.' ','))
-	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $< 2>&1 | tee -a $(BUILDLOG)
+	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $<
 
 $(ELFFILE): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS) 2>&1 | tee -a $(BUILDLOG)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS)
 	echo "Commit used for building:" 2>&1 | tee -a $(BUILDLOG)
 	git rev-parse HEAD 2>&1 | tee -a $(BUILDLOG)
 
 $(HEXFILE): $(ELFFILE)
-	$(OBJCOPY) -O ihex -R .eeprom $< $@ 2>&1 | tee -a $(BUILDLOG)
+	$(OBJCOPY) -O ihex -R .eeprom $< $@
 	$(SIZE) $< 2>&1 | tee -a $(BUILDLOG)
 
 .PHONY: clean
@@ -292,9 +293,10 @@ changelog: $(VERTOOL)
 	-cat $(PROJ_DIR)/CHANGELOG.md
 
 .PHONY: package
-package: $(HEXFILE) nextver changelog
+package: $(HEXFILE) $(BUILD_DIR)/next-version changelog
 	rm -rf package
 	mkdir -p package
+	cp $(BUILDLOG) package/.
 	cp $(HEXFILE) package/.
 	cp $(ELFFILE) package/.
 	cp $(OUT)/$(PROGNAME).map package/.
@@ -313,7 +315,7 @@ ci-status:
 
 # versioning tool must be run from top level project directory (where .git is)
 .PHONY: release
-release: changelog
+release: nextver changelog
 	cd $(PROJ_DIR); $(VERTOOL) tag-and-commit CHANGELOG.md
 	RELEASE_VERSION=$$(<$(BUILD_DIR)/next-version); \
 	ARTIFACT=$$(realpath --relative-to $(PROJ_DIR) $(BUILD_DIR))/bmsnode-$$RELEASE_VERSION.tar.gz; \
