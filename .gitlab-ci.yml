@@ -73,4 +73,4 @@ release:
           when: manual
     script:
         - "make -C $BUILD_DIR ci-status"
-        - "make -C $BUILD_DIR release"
+        - "make -C $BUILD_DIR release PRODUCTION=1"

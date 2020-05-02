@@ -7,6 +7,7 @@
 #define RXCIE0 (7)
 #define UDRIE0 (5)
 #define RXC0 (7)
+#define TXC0 (6)
 #define UDRE0 (5)
 
 #ifdef __cplusplus

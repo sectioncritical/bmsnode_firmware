@@ -130,7 +130,7 @@ PY3=$(shell command -v python3 || command -v python)
 
 venv/bin/activate: requirements.txt
 	test -d venv || $(PY3) -m venv venv
-	. venv/bin/activate; pip install -U pip; pip install -Ur $<
+	. venv/bin/activate; pip install -U pip; pip install -U wheel; pip install -Ur $<
 	touch venv/bin/activate
 
 .PHONY: realclean

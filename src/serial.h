@@ -49,6 +49,24 @@ extern uint8_t ser_write(uint8_t *buf, uint8_t len);
  */
 extern void ser_flush(void);
 
+/**
+ * Determine if serial hardware is active.
+ *
+ * Checks internal state of the serial hardware to see if the serial module is
+ * active (if active the MCU should not sleep). This function checks the
+ * hardware to see if there is any ongoing transmit or receive activity, or if
+ * there is any data in a serial buffer.
+ *
+ * @return `true` if the serail module is active at the moment (TX or RX is
+ * in progress)
+ *
+ * @note the return state is valid only for the moment that it is called. A
+ * new interrupt could occur in the next instruction cycle after the return.
+ * It is up to the caller to ensure interrupt enablement is handled in a safe
+ * way prior to putting the MCU to sleep.
+ */
+extern bool ser_is_active(void);
+
 #ifdef __cplusplus
 }
 #endif

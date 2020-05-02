@@ -28,6 +28,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/atomic.h>
 
 #include "pkt.h"
 
@@ -83,6 +84,31 @@ bool rxint_disable(void)
 // See header file for public function API descriptions.
 //
 //////////
+
+// determine if serial hardware is active
+// criteria:
+// - tx sw buffer is not  empty
+// - tx interrupt is enabled (which means there is ongoing tx operation)
+// - txc complete flag is not set (tx byte in progress)
+// - rx is not empty (incoming bytes to process)
+//
+// This should be coupled with checking the packet processor as well
+//
+bool ser_is_active(void)
+{
+    bool b_isactive = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        if (BUF_NOTEMPTY()
+         || (UCSR0B & _BV(UDRIE0))
+         || !(UCSR0A & _BV(TXC0))
+         || (UCSR0A & _BV(RXC0)))
+        {
+            b_isactive = true;
+        }
+    }
+    return b_isactive;
+}
 
 // write data to the serial output
 // TODO: consider all or nothing write, instead of partial when there
@@ -154,6 +180,8 @@ ISR(USART0_UDRE_vect)
         if (flags & _BV(UDRE0))
         {
             // read byte from buffer and write to uart TX
+            // clear TXC0 so that it can be used to detect tx complete
+            UCSR0A &= ~_BV(TXC0);
             UDR0 = txbuf[tailp++];
             tailp &= 0x1F;
         }

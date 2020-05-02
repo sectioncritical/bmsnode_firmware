@@ -534,3 +534,58 @@ TEST_CASE("Packet send")
         CHECK(txbuf[totlen - 1] == crc);
     }
 }
+
+TEST_CASE("is active")
+{
+    // put pkt processor in known state
+    pkt_reset();
+
+    SECTION("not active")
+    {
+        bool ret = pkt_is_active();
+        CHECK_FALSE(ret);
+    }
+
+    SECTION("rxbuf in use")
+    {
+        // alloc a packet so that one will be in use
+        packet_t *pkt = pkt_rx_alloc();
+        REQUIRE(pkt);
+        bool ret = pkt_is_active();
+        CHECK(ret);
+    }
+
+    SECTION("pkt is ready")
+    {
+        // send a ping packet so that a packet will be ready
+        send_preambles(3);
+        send_sync();
+        uint8_t crc = send_hdr_get_crc(0, 1, 1, 0);
+        INFO("CRC is " << crc);
+        // send the crc to the parser, but dont check for packet ready
+        // packet should be ready after this
+        pkt_parser(crc);
+
+        // now verify that pkt module is active
+        bool ret = pkt_is_active();
+        CHECK(ret);
+    }
+
+    SECTION("in a processing state")
+    {
+        // this test is probably not valid because to set a non-idle
+        // parser state, requires sending some bytes in, which also means
+        // that the rxbuf will be in use, so the pkt parser is "active"
+        // due to rxbuf in use, and not due to processing state
+
+        // start sending a ping packet so parser is not in idle state
+        send_preambles(3);
+        send_sync();
+        uint8_t crc = send_hdr_get_crc(0, 1, 1, 0);
+        INFO("CRC is " << crc);
+
+        // now verify that pkt module is active
+        bool ret = pkt_is_active();
+        CHECK(ret);
+    }
+}

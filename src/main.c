@@ -28,6 +28,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
+#include <avr/sleep.h>
 
 #define F_CPU 8000000L
 #define BAUD 4800
@@ -73,9 +74,13 @@ config_t *nodecfg;
 void device_init(void)
 {
     // turn off peripherals we are not using
-    PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI);
+    PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI) | _BV(PRTIM2) | _BV(PRTIM1);
 
-    // set up watchdog
+    // turn off analog comparators
+    ACSR0A = 0x80;
+    ACSR1A = 0x80;
+
+    // not using watchdog, so disable it
 
     // set up IO
     // this sets up GPIOs. alt functions are set up with peripheral inits
@@ -88,6 +93,7 @@ void device_init(void)
     // set up UART0
     UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0); // enable tx, rx, rx int
     UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); // 8n1
+    UCSR0D = _BV(SFDE0); // start frame detector
     UBRR0H = UBRRH_VALUE;
     UBRR0L = UBRRL_VALUE;
 
@@ -110,6 +116,7 @@ ISR(TIMER0_COMPA_vect)
     ++systick;
 }
 
+// safely read the current tick value
 static uint16_t get_systick(void)
 {
     uint16_t ticks;
@@ -120,22 +127,29 @@ static uint16_t get_systick(void)
     return ticks;
 }
 
-static bool is_timeout(uint16_t start, uint16_t timeout)
+// compute if a timeout has expired
+static bool is_timeout(uint16_t timeout)
 {
-    return (get_systick() - start) >= timeout;
+    return (get_systick() - timeout) < 32768;
 }
 
-//static uint8_t testdata[2] = { 'A', '-' };
+// returns a timeout value based on input milliseconds
+// millisec should not be greater than 32767
+static uint16_t set_timeout(uint16_t millisec)
+{
+    return get_systick() + millisec;
+}
 
-static uint16_t ticks_blink;
+static uint16_t blink_timeout;
+static uint16_t sleep_timeout;
 
 int main(void)
 {
-    // preserve the reset cause, take TBD actions
-    uint8_t reset_cause = MCUSR;
-    MCUSR = 0;
+    cli(); // should already be disabled, just to be sure
     wdt_disable();
 
+#if 0 // for now we do not have any dependency on reset cause
+    // take action based on the reason for reset
     if (reset_cause & WDRF)
     {
         // watchdog reset
@@ -152,6 +166,7 @@ int main(void)
     {
         // power-on reset
     }
+#endif
 
     // hardware init of MCU
     device_init();
@@ -159,28 +174,113 @@ int main(void)
     // load the node configuration
     nodecfg = cfg_load();
 
+    // send out one byte on wake (this causes TXC to get set)
+    UDR0 = 0x55;
+
     pkt_reset(); // init packet parser
     ser_flush(); // init serial module
 
     // enable system interrupts
     sei();
 
-    ticks_blink = get_systick();
+    // turn on blue LED at the start
+    PORTA |= _BV(PORTA5);
+
+    // do an initial blink for 5 seconds
+    // with 100 ms toggle
+    blink_timeout = set_timeout(100);
+    sleep_timeout = set_timeout(5000);
+
+    while(!is_timeout(sleep_timeout))
+    {
+        if (is_timeout(blink_timeout))
+        {
+            blink_timeout += 100;
+            PORTA ^= _BV(PORTA5);
+        }
+    }
+
+    // leave the blue LED on
+    PORTA |= _BV(PORTA5);
+
+    // reset sleep timeout to 1 sec
+    // and blink to 200 msec toggle
+    blink_timeout = set_timeout(200);
+    sleep_timeout = set_timeout(1000);
 
     // blinky loop
     while (1)
     {
-        if (is_timeout(ticks_blink, 500))
+        // run blue LED blinker
+        if (is_timeout(blink_timeout))
         {
-            ticks_blink += 500;
-            PORTA ^= _BV(PORTA6);
+            blink_timeout += 200;
+            PORTA ^= _BV(PORTA5);
         }
 
-        //UDR0 = 'Z'; // 0x5A
-        //ser_write(testdata, 2);
+        // run the command processor
+        bool b_processed = cmd_process();
 
-        cmd_process();
+        // if there was a command processed, or if the pkt or ser
+        // modules indicate they are active, reset the sleep timeout
+        if (b_processed
+         || pkt_is_active()
+         || ser_is_active())
+        {
+            sleep_timeout = set_timeout(1000);
+        }
+
+        // if sleep timeout expires, then go to low pwer mode
+        if (is_timeout(sleep_timeout))
+        {
+            // force LED outputs off
+            PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
+            // disable the UART TX (for power saving)
+            UCSR0B &= ~_BV(TXEN0);
+
+            // go to sleep
+            set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+            sleep_mode();
+
+            // WAKING UP
+            // re-enable UART TX
+            UCSR0B |= _BV(TXEN0);
+            // turn on blue LED and set a timeout
+            PORTA |= _BV(PORTA5);
+            blink_timeout = set_timeout(200);
+            sleep_timeout = set_timeout(1000);
+        }
     }
 
     return 0;
 }
+
+// this is code to fetch and save the reset cause, which can later be
+// used in main in conditional code related to cause of reset
+// I am keeping it here as a reference in case I need to add it back later
+#if 0
+// TODO make sure this is not initialized by C runtime
+volatile uint8_t __attribute__ ((used)) reset_cause;
+
+// this function will run before C startup
+// use it to detect if boot loader started and to get the
+// reset cause
+void __attribute__ ((noinline, used)) __init(void)
+{
+    register uint8_t r2_value __asm__("r2");
+
+    // if boot loader started us, then read reset cause from R2
+    // note: BOOTLOADER_START is placeholder for method to detect bootloader
+    if (BOOTLOADER_START)
+    {
+        __asm__ volatile("": "=r" (r2_value));
+        reset_cause = r2_value;
+    }
+    // otherwise, no bootloader, read reset cause from MCU register
+    else
+    {
+        reset_cause = MCUSR;
+        MCUSR = 0;
+    }
+}
+#endif

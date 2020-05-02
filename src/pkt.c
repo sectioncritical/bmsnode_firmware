@@ -85,6 +85,30 @@ static txpacket_t txpkt =
 //
 //////////
 
+// determine if packet processor is active
+// it is active if:
+// - any packet buffers are in use
+// - a packet is ready for command processing
+// - packet state machine is not in SEARCH or SYNC mode
+//
+// this should be coupled with checking the serial hardware as well, to
+// make sure the rx input is idle (see serial module)
+//
+bool pkt_is_active(void)
+{
+    bool b_isactive = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        if (rxbuf_inuse
+         || (ready_packet != NULL)
+         || ((state != RX_SEARCH) && (state != RX_SYNC)))
+        {
+            b_isactive = true;
+        }
+    }
+    return b_isactive;
+}
+
 // Reset the packet parser internal state.
 void pkt_reset(void)
 {

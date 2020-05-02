@@ -70,6 +70,22 @@ extern "C" {
 extern void pkt_reset(void);
 
 /**
+ * Determine if packet processor is active.
+ *
+ * Checks internal state of packet processor for ongoing activity. This
+ * function checks for any incoming packets in process and any packets not yet
+ * handled.
+ *
+ * @return `true` if the packet processor is active at the moment.
+ *
+ * @note the return state is valid only for the moment that it is called. A
+ * new interrupt could occur in the next instruction cycle after the return.
+ * It is up to the caller to ensure interrupt enablement is handled in a safe
+ * way prior to putting the MCU to sleep.
+ */
+extern bool pkt_is_active(void);
+
+/**
  * Release an RX packet buffer for re-use.
  *
  * @param pkt pointer to packet to free

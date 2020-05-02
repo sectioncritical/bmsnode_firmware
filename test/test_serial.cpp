@@ -420,3 +420,49 @@ TEST_CASE("TX isr")
         CHECK(*serial_internals.ptailp == 13);
     }
 }
+
+TEST_CASE("is active")
+{
+    *serial_internals.pheadp = 0;
+    *serial_internals.ptailp = 0;
+    UCSR0A = 0x40; // TXC0 is set which means tx complete
+    UCSR0B = 0;
+
+    SECTION("all inactive")
+    {
+        bool ret = ser_is_active();
+        CHECK_FALSE(ret);
+    }
+
+    SECTION("tx int enabled")
+    {
+        // set UDRIE0 bit (tx int enabled)
+        UCSR0B = 0x20;
+        bool ret = ser_is_active();
+        CHECK(ret);
+    }
+
+    SECTION("buffer not empty")
+    {
+        // set buffer pointers so the buffer is not empty
+        *serial_internals.pheadp = 3;
+        bool ret = ser_is_active();
+        CHECK(ret);
+    }
+
+    SECTION("tx not complete")
+    {
+        // clear TXC0 flag
+        UCSR0A = 0;
+        bool ret = ser_is_active();
+        CHECK(ret);
+    }
+
+    SECTION("rx not empty")
+    {
+        // set rx data available flag
+        UCSR0A |= 0x80;
+        bool ret = ser_is_active();
+        CHECK(ret);
+    }
+}

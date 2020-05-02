@@ -11,6 +11,7 @@ RUN apt-get update \
         python3 \
         python3-pip \
         python3-venv \
+        python3-wheel \
         python3-pygments \
         git \
         libpcre3-dev \
