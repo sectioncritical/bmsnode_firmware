@@ -28,13 +28,15 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg
+TESTS=bmstest_main bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg
 
+MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
 SER_OBJS=test_main.o test_serial.o serial.o io.o
 CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o ver.o
 CFG_OBJS=test_main.o test_cfg.o cfg.o crc16.o
 
+TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
 TEST_SER_OBJS=$(addprefix $(OBJDIR)/, $(SER_OBJS))
 TEST_CMD_OBJS=$(addprefix $(OBJDIR)/, $(CMD_OBJS))
@@ -52,6 +54,9 @@ CXXFLAGS=-g -std=c++11 -O0 -Werror -Wall
 LDFLAGS=--coverage
 
 all: $(TESTBINS)
+
+# main test dependencies
+$(BINDIR)/bmstest_main: $(TEST_MAIN_OBJS) | $(BINDIR)
 
 # packet test dependencies
 $(BINDIR)/bmstest_pkt: $(TEST_PKT_OBJS) | $(BINDIR)

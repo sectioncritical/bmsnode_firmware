@@ -32,7 +32,6 @@
 
 #define F_CPU 8000000L
 #define BAUD 4800
-#include <util/delay.h>
 #include <util/setbaud.h>
 #include <util/atomic.h>
 
@@ -143,7 +142,7 @@ static uint16_t set_timeout(uint16_t millisec)
 static uint16_t blink_timeout;
 static uint16_t sleep_timeout;
 
-int main(void)
+void main_loop(void)
 {
     cli(); // should already be disabled, just to be sure
     wdt_disable();
@@ -250,10 +249,25 @@ int main(void)
             blink_timeout = set_timeout(200);
             sleep_timeout = set_timeout(1000);
         }
-    }
 
+#ifdef UNIT_TEST
+        extern bool test_exit;
+        if (test_exit)
+        {
+            break;
+        }
+#endif
+
+    }
+}
+
+#ifndef UNIT_TEST
+int main(void)
+{
+    main_loop();
     return 0;
 }
+#endif
 
 // this is code to fetch and save the reset cause, which can later be
 // used in main in conditional code related to cause of reset

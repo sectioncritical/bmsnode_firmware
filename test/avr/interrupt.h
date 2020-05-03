@@ -8,7 +8,10 @@
 extern "C" {
 #endif
 
-extern void cli(void);
+extern volatile bool global_int_flag;
+
+#define cli() (global_int_flag = false)
+#define sei() (global_int_flag = true)
 
 #ifdef __cplusplus
 }
