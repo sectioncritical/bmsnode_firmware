@@ -39,6 +39,7 @@
 #include "serial.h"
 #include "cfg.h"
 #include "pkt.h"
+#include "tmr.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -95,49 +96,8 @@ void device_init(void)
     UCSR0D = _BV(SFDE0); // start frame detector
     UBRR0H = UBRRH_VALUE;
     UBRR0L = UBRRL_VALUE;
-
-    // 1 ms timer tick using timer 0
-    // 8mhz w /64 prescaler = 125000 hz
-    // 125000 Hz /125 ==> 1 khz --> 1 ms
-    // timer 0 in CTC mode, count up, OCR0A=124, OCF0A interrupt
-    TCCR0A = _BV(WGM01); // CTC mode
-    TCCR0B = _BV(CS01) | _BV(CS00); // prescaler /64
-    OCR0A = 124;
-    TIMSK0 = _BV(OCIE0A);
-    // timer should be running and generating 1 ms interrupts
 }
 
-static volatile uint16_t systick = 0;
-
-// TODO: timer isr here for now. create timer module
-ISR(TIMER0_COMPA_vect)
-{
-    ++systick;
-}
-
-// safely read the current tick value
-static uint16_t get_systick(void)
-{
-    uint16_t ticks;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-        ticks = systick;
-    }
-    return ticks;
-}
-
-// compute if a timeout has expired
-static bool is_timeout(uint16_t timeout)
-{
-    return (get_systick() - timeout) < 32768;
-}
-
-// returns a timeout value based on input milliseconds
-// millisec should not be greater than 32767
-static uint16_t set_timeout(uint16_t millisec)
-{
-    return get_systick() + millisec;
-}
 
 static uint16_t blink_timeout;
 static uint16_t sleep_timeout;
@@ -169,6 +129,7 @@ void main_loop(void)
 
     // hardware init of MCU
     device_init();
+    tmr_init();
 
     // load the node configuration
     nodecfg = cfg_load();
@@ -187,12 +148,12 @@ void main_loop(void)
 
     // do an initial blink for 5 seconds
     // with 100 ms toggle
-    blink_timeout = set_timeout(100);
-    sleep_timeout = set_timeout(5000);
+    blink_timeout = tmr_set(100);
+    sleep_timeout = tmr_set(5000);
 
-    while(!is_timeout(sleep_timeout))
+    while(!tmr_expired(sleep_timeout))
     {
-        if (is_timeout(blink_timeout))
+        if (tmr_expired(blink_timeout))
         {
             blink_timeout += 100;
             PORTA ^= _BV(PORTA5);
@@ -204,14 +165,14 @@ void main_loop(void)
 
     // reset sleep timeout to 1 sec
     // and blink to 200 msec toggle
-    blink_timeout = set_timeout(200);
-    sleep_timeout = set_timeout(1000);
+    blink_timeout = tmr_set(200);
+    sleep_timeout = tmr_set(1000);
 
     // blinky loop
     while (1)
     {
         // run blue LED blinker
-        if (is_timeout(blink_timeout))
+        if (tmr_expired(blink_timeout))
         {
             blink_timeout += 200;
             PORTA ^= _BV(PORTA5);
@@ -226,11 +187,11 @@ void main_loop(void)
          || pkt_is_active()
          || ser_is_active())
         {
-            sleep_timeout = set_timeout(1000);
+            sleep_timeout = tmr_set(1000);
         }
 
         // if sleep timeout expires, then go to low pwer mode
-        if (is_timeout(sleep_timeout))
+        if (tmr_expired(sleep_timeout))
         {
             // force LED outputs off
             PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
@@ -246,8 +207,8 @@ void main_loop(void)
             UCSR0B |= _BV(TXEN0);
             // turn on blue LED and set a timeout
             PORTA |= _BV(PORTA5);
-            blink_timeout = set_timeout(200);
-            sleep_timeout = set_timeout(1000);
+            blink_timeout = tmr_set(200);
+            sleep_timeout = tmr_set(1000);
         }
 
 #ifdef UNIT_TEST

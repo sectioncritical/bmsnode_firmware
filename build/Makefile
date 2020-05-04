@@ -56,7 +56,13 @@ AVRDUDE_CONF?= +avrdude/t841.conf
 OUT=obj
 SRC=../src
 
-OBJS=$(OUT)/main.o $(OUT)/pkt.o $(OUT)/cmd.o $(OUT)/serial.o $(OUT)/cfg.o $(OUT)/ver.o
+OBJS=$(OUT)/main.o
+OBJS+=$(OUT)/pkt.o
+OBJS+=$(OUT)/cmd.o
+OBJS+=$(OUT)/serial.o
+OBJS+=$(OUT)/cfg.o
+OBJS+=$(OUT)/tmr.o
+OBJS+=$(OUT)/ver.o
 
 # to run the versioning tool we need to switch around to different
 # directories. So it is handy to be able to refer to directopries and files

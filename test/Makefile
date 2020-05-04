@@ -28,19 +28,21 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_main bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg
+TESTS=bmstest_main bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg bmstest_tmr
 
 MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
 SER_OBJS=test_main.o test_serial.o serial.o io.o
 CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o ver.o
 CFG_OBJS=test_main.o test_cfg.o cfg.o crc16.o
+TMR_OBJS=test_main.o test_tmr.o tmr.o io.o
 
 TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
 TEST_SER_OBJS=$(addprefix $(OBJDIR)/, $(SER_OBJS))
 TEST_CMD_OBJS=$(addprefix $(OBJDIR)/, $(CMD_OBJS))
 TEST_CFG_OBJS=$(addprefix $(OBJDIR)/, $(CFG_OBJS))
+TEST_TMR_OBJS=$(addprefix $(OBJDIR)/, $(TMR_OBJS))
 
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
@@ -69,6 +71,9 @@ $(BINDIR)/bmstest_cmd: $(TEST_CMD_OBJS) | $(BINDIR)
 
 # config test dependencies
 $(BINDIR)/bmstest_cfg: $(TEST_CFG_OBJS) | $(BINDIR)
+
+# timer test dependencies
+$(BINDIR)/bmstest_tmr: $(TEST_TMR_OBJS) | $(BINDIR)
 
 # compile a .c file
 $(OBJDIR)/%.o: %.c | $(OBJDIR)

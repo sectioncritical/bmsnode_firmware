@@ -24,35 +24,60 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
 
-#include "catch.hpp"
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/atomic.h>
 
-#include "cfg.h"
+#include "tmr.h"
 
-// we are using fast-faking-framework for provding fake functions called
-// by serial module.
-// https://github.com/meekrosoft/fff
-#include "fff.h"
-DEFINE_FFF_GLOBALS;
+// internal system tick counter
+static volatile uint16_t systick = 0;
 
-// declare C-type functions
-extern "C" {
-
-FAKE_VALUE_FUNC(config_t *, cfg_load);
-FAKE_VALUE_FUNC(bool, cmd_process);
-FAKE_VALUE_FUNC(bool, pkt_is_active);
-FAKE_VOID_FUNC(pkt_reset);
-FAKE_VOID_FUNC(ser_flush);
-FAKE_VALUE_FUNC(bool, ser_is_active);
-FAKE_VOID_FUNC(set_sleep_mode);
-FAKE_VOID_FUNC(sleep_mode);
-FAKE_VOID_FUNC(wdt_disable);
-FAKE_VOID_FUNC(tmr_init);
-FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
-FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
+// timer 0 interrupt handler
+ISR(TIMER0_COMPA_vect)
+{
+    ++systick;
 }
 
-bool test_exit = false;
+// safely read the current tick value
+static uint16_t tmr_get_ticks(void)
+{
+    uint16_t ticks;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        ticks = systick;
+    }
+    return ticks;
+}
 
+// initialize the hardware timer for generating system ticks
+void tmr_init(void)
+{
+    // 1 ms timer tick using timer 0
+    // 8mhz w /64 prescaler = 125000 hz
+    // 125000 Hz /125 ==> 1 khz --> 1 ms
+    // timer 0 in CTC mode, count up, OCR0A=124, OCF0A interrupt
+    TCCR0A = _BV(WGM01); // CTC mode
+    TCCR0B = _BV(CS01) | _BV(CS00); // prescaler /64
+    OCR0A = 124;
+    TIMSK0 = _BV(OCIE0A);
+    // timer should be running and generating 1 ms interrupts
+    // global interrupts are enabled by main app
+}
+
+// set a timer. max millisec is 32767
+uint16_t tmr_set(uint16_t millisec)
+{
+    return tmr_get_ticks() + millisec;
+}
+
+// check if timer is expired
+bool tmr_expired(uint16_t tmrset)
+{
+    return (uint16_t)(tmr_get_ticks() - tmrset) < 32768U;
+}
+
+#ifdef UNIT_TEST
+volatile uint16_t *p_systick = &systick;
+#endif

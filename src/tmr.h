@@ -22,37 +22,38 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
+#ifndef __TMR_H__
+#define __TMR_H__
 
-#include "catch.hpp"
-
-#include "cfg.h"
-
-// we are using fast-faking-framework for provding fake functions called
-// by serial module.
-// https://github.com/meekrosoft/fff
-#include "fff.h"
-DEFINE_FFF_GLOBALS;
-
-// declare C-type functions
+#ifdef __cplusplus
 extern "C" {
+#endif
 
-FAKE_VALUE_FUNC(config_t *, cfg_load);
-FAKE_VALUE_FUNC(bool, cmd_process);
-FAKE_VALUE_FUNC(bool, pkt_is_active);
-FAKE_VOID_FUNC(pkt_reset);
-FAKE_VOID_FUNC(ser_flush);
-FAKE_VALUE_FUNC(bool, ser_is_active);
-FAKE_VOID_FUNC(set_sleep_mode);
-FAKE_VOID_FUNC(sleep_mode);
-FAKE_VOID_FUNC(wdt_disable);
-FAKE_VOID_FUNC(tmr_init);
-FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
-FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
+/**
+ * Initialize timer module. Should be called once at program start.
+ */
+extern void tmr_init(void);
+
+/**
+ * Set a timer timeout.
+ *
+ * @param duration of the timer in milliseconds, no greater than 32767 ms
+ *
+ * @return a value representing a future timeout value
+ */
+extern uint16_t tmr_set(uint16_t millisec);
+
+/**
+ * Check if a previously set timer has expired.
+ *
+ * @param tmrset is the value returned from tmr_set()
+ *
+ * @return true if the time duration has expired, false otherwise
+ */
+extern bool tmr_expired(uint16_t tmrset);
+
+#ifdef __cplusplus
 }
+#endif
 
-bool test_exit = false;
-
+#endif
