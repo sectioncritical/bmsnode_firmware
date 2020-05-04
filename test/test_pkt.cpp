@@ -28,7 +28,7 @@
 
 #include "catch.hpp"
 #include "pkt.h"
-#include "serial.h"
+#include "ser.h"
 #include "util/crc16.h"
 
 // we are using fast-faking-framework for provding fake functions called

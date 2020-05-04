@@ -22,8 +22,8 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __SERIAL_H__
-#define __SERIAL_H__
+#ifndef __SER_H__
+#define __SER_H__
 
 #ifdef __cplusplus
 extern "C" {

@@ -36,7 +36,7 @@
 #include <util/atomic.h>
 
 #include "cmd.h"
-#include "serial.h"
+#include "ser.h"
 #include "cfg.h"
 #include "pkt.h"
 #include "tmr.h"

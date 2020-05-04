@@ -28,11 +28,11 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_main bmstest_pkt bmstest_serial bmstest_cmd bmstest_cfg bmstest_tmr
+TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr
 
 MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
-SER_OBJS=test_main.o test_serial.o serial.o io.o
+SER_OBJS=test_main.o test_ser.o ser.o io.o
 CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o ver.o
 CFG_OBJS=test_main.o test_cfg.o cfg.o crc16.o
 TMR_OBJS=test_main.o test_tmr.o tmr.o io.o
@@ -64,7 +64,7 @@ $(BINDIR)/bmstest_main: $(TEST_MAIN_OBJS) | $(BINDIR)
 $(BINDIR)/bmstest_pkt: $(TEST_PKT_OBJS) | $(BINDIR)
 
 # serial test dependencies
-$(BINDIR)/bmstest_serial: $(TEST_SER_OBJS) | $(BINDIR)
+$(BINDIR)/bmstest_ser: $(TEST_SER_OBJS) | $(BINDIR)
 
 # command test dependencies
 $(BINDIR)/bmstest_cmd: $(TEST_CMD_OBJS) | $(BINDIR)

@@ -31,6 +31,7 @@
 #include <util/atomic.h>
 
 #include "pkt.h"
+#include "ser.h"
 
 // serial transmit buffer and pointers
 static uint8_t headp = 0;

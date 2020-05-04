@@ -30,7 +30,7 @@
 #include <avr/io.h> // special test version of header
 
 #include "catch.hpp"
-#include "serial.h"
+#include "ser.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by serial module.

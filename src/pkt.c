@@ -29,7 +29,7 @@
 #include <util/atomic.h>
 
 #include "pkt.h"
-#include "serial.h"
+#include "ser.h"
 
 /*
  * |Byte| Field  | Description                              |
