@@ -69,6 +69,17 @@ extern "C" {
  */
 extern bool cmd_process(void);
 
+/**
+ * Check if there was a DFU command.
+ *
+ * If a DFU command (for any node) has occurred since the last time this was
+ * called, it iwll return `true`. It returns true only once per received DFU
+ * command.
+ *
+ * @return true if a DFU command has been received since last check.
+ */
+extern bool cmd_was_dfu(void);
+
 #ifdef __cplusplus
 }
 #endif

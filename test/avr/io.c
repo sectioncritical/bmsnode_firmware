@@ -25,3 +25,8 @@ volatile uint8_t ACSR0A = 0;
 volatile uint8_t ACSR1A = 0;
 
 volatile bool global_int_flag = false;
+
+void _delay_loop_2(uint16_t count)
+{
+    return;
+}

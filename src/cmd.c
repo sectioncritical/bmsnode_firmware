@@ -28,6 +28,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/delay_basic.h>
 
 #include "pkt.h"
 #include "cmd.h"
@@ -67,10 +68,32 @@ static bool cmd_dfu(void)
     // TODO: put IO pins in safe state
     // TODO: should it send a reply? then it will need to wait until
     // message was sent before resetting
+
     // optiboot expects interrupts to be disabled
     cli();
+
+    // wait 5 ms to ensure last bytes go out
+    _delay_loop_2(10000); // 10000 ==> 5 ms (8MHz at 4 cycle/loop)
+
+    // restore the power reduction register to its reset value
+    // optiboot uses timer 1
+    PRR = 0;
+
+    // set UART registers to their reset state
+    UCSR0A = 0;
+    UCSR0B = 0;
+    UCSR0C = 0x06;
+    UCSR0D = 0;
+
+    // set timer 0 back to reset state
+    // (BL does not use it, but we want it disabled)
+    TIMSK0 = 0;
+    TCCR0A = 0;
+    TCCR0B = 0;
+
+    // clearing MCUSR tells optiboot that app is starting it
     MCUSR = 0;
-    swreset();
+    swreset();  // jump to boot loader, will not return
     return false;
 }
 
@@ -112,6 +135,19 @@ static bool cmd_addr(packet_t *pkt)
     return false;
 }
 
+static bool b_dfu_pending = false;
+
+// check if there was a recent dfu command
+bool cmd_was_dfu(void)
+{
+    bool ret = b_dfu_pending;
+    if (b_dfu_pending)
+    {
+        b_dfu_pending = false;
+    }
+    return ret;
+}
+
 // run command processor
 bool cmd_process(void)
 {
@@ -121,6 +157,13 @@ bool cmd_process(void)
     // valid packet
     if (pkt)
     {
+        // save indicator of any DFU command, for any node
+        // this is used by app main loop
+        if (pkt->cmd == CMD_DFU)
+        {
+            b_dfu_pending = true;
+        }
+
         // process ADDR command for any address
         if (pkt->cmd == CMD_ADDR)
         {

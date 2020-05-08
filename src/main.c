@@ -98,13 +98,23 @@ void device_init(void)
     UBRR0L = UBRRL_VALUE;
 }
 
-
-static uint16_t blink_timeout;
-static uint16_t sleep_timeout;
+// main loop states
+typedef enum
+{
+    STATE_IDLE,
+    STATE_DFU,
+    STATE_SLEEP
+} appstate_t;
 
 void main_loop(void)
 {
+    // declaring these as static so that they do not end up on the stack
+    static uint16_t blink_timeout;
+    static uint16_t sleep_timeout;
+    static uint16_t blink_period;
+
     cli(); // should already be disabled, just to be sure
+    MCUSR = 0; // this has to be done here in order to disable WDT
     wdt_disable();
 
 #if 0 // for now we do not have any dependency on reset cause
@@ -147,15 +157,16 @@ void main_loop(void)
     PORTA |= _BV(PORTA5);
 
     // do an initial blink for 5 seconds
-    // with 100 ms toggle
-    blink_timeout = tmr_set(100);
+    // with 50 ms toggle
+    // rapid toggle means bms node is starting up
+    blink_timeout = tmr_set(50);
     sleep_timeout = tmr_set(5000);
 
     while(!tmr_expired(sleep_timeout))
     {
         if (tmr_expired(blink_timeout))
         {
-            blink_timeout += 100;
+            blink_timeout += 50;
             PORTA ^= _BV(PORTA5);
         }
     }
@@ -165,8 +176,11 @@ void main_loop(void)
 
     // reset sleep timeout to 1 sec
     // and blink to 200 msec toggle
-    blink_timeout = tmr_set(200);
+    // start in idle state
+    blink_period = 200;
+    blink_timeout = tmr_set(blink_period);
     sleep_timeout = tmr_set(1000);
+    appstate_t state = STATE_IDLE;
 
     // blinky loop
     while (1)
@@ -174,41 +188,91 @@ void main_loop(void)
         // run blue LED blinker
         if (tmr_expired(blink_timeout))
         {
-            blink_timeout += 200;
+            blink_timeout += blink_period;
             PORTA ^= _BV(PORTA5);
         }
 
         // run the command processor
         bool b_processed = cmd_process();
 
-        // if there was a command processed, or if the pkt or ser
-        // modules indicate they are active, reset the sleep timeout
-        if (b_processed
-         || pkt_is_active()
-         || ser_is_active())
+        // processing per the current app state
+        switch (state)
         {
-            sleep_timeout = tmr_set(1000);
-        }
+            // IDLE - awake because of activity. remain in this state
+            // until the sleep timeout expires or dfu happens
+            case STATE_IDLE:
+                // if last command was DFU, then go to the DFU state
+                if (cmd_was_dfu())
+                {
+                    // set a longer sleep timeout for dfu mode,
+                    // and update the blink indicator rate
+                    sleep_timeout = tmr_set(8000);
+                    blink_period = 1000;
+                    blink_timeout = tmr_set(blink_period);
+                    state = STATE_DFU;
+                }
 
-        // if sleep timeout expires, then go to low pwer mode
-        if (tmr_expired(sleep_timeout))
-        {
-            // force LED outputs off
-            PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
-            // disable the UART TX (for power saving)
-            UCSR0B &= ~_BV(TXEN0);
+                // otherwise, monitor activity and wait for sleep timeout
+                else
+                {
+                    // if a command was just processed, or if other modules
+                    // are current active (packets in processs) then
+                    // reset the sleep timeout
+                    if (b_processed || pkt_is_active() || ser_is_active())
+                    {
+                        sleep_timeout = tmr_set(1000);
+                    }
 
-            // go to sleep
-            set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-            sleep_mode();
+                    // see if sleep timeout has expired
+                    // if so go to sleep state
+                    else if (tmr_expired(sleep_timeout))
+                    {
+                        state = STATE_SLEEP;
+                    }
+                }
+                break;
 
-            // WAKING UP
-            // re-enable UART TX
-            UCSR0B |= _BV(TXEN0);
-            // turn on blue LED and set a timeout
-            PORTA |= _BV(PORTA5);
-            blink_timeout = tmr_set(200);
-            sleep_timeout = tmr_set(1000);
+            // DFU - in extended wake mode because DFU is happening somewhere
+            case STATE_DFU:
+                // stay in this state until dfu timeout expires
+                if (tmr_expired(sleep_timeout))
+                {
+                    // once the timer expires, drop into idle mode in
+                    // case some other activity happens
+                    blink_period = 200;
+                    blink_timeout = tmr_set(blink_period);
+                    sleep_timeout = tmr_set(1000);
+                    state = STATE_IDLE;
+                }
+                break;
+
+            // SLEEP - going into sleep state to save power
+            // will remain in this state until waken by serial event
+            case STATE_SLEEP:
+                // force LED outputs off
+                PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
+                // disable the UART TX (for power saving)
+                UCSR0B &= ~_BV(TXEN0);
+
+                // go to sleep
+                set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+                sleep_mode();
+
+                // WAKING UP
+                // re-enable UART TX
+                UCSR0B |= _BV(TXEN0);
+                // turn on blue LED and set a timeout
+                PORTA |= _BV(PORTA5);
+
+                // DELIBERATE FALL THROUGH
+                // returns us to idle state
+
+            default:
+                blink_period = 200;
+                blink_timeout = tmr_set(blink_period);
+                sleep_timeout = tmr_set(1000);
+                state = STATE_IDLE;
+                break;
         }
 
 #ifdef UNIT_TEST
