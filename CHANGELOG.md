@@ -4,6 +4,20 @@
 
 <!--- next entry here -->
 
+## 0.4.0
+2020-05-10
+
+### Features
+
+- **power:** add power save mode in main loop #13 (968f9676155ddf031cdf633a50de8d30c2b0b5c0)
+
+### Fixes
+
+- add unit test placeholder for "main", no tests implemented yet (d76d739ad1e0754aa68dcc529531eab296d5786c)
+- **tmr:** create timer module (dde75572b6e6b316ccdac620d3e34c547f28b8cb)
+- **ser:** rename ser module to match others style (72fff5e29ffe9f1dc3ca6aa91ffa5daa86bcaf3f)
+- add DFU detection to keep from sleeping during dfu operation (da8790951c8bde038e78636cd84056974d0a42ee)
+
 ## 0.3.1
 2020-04-29
 
