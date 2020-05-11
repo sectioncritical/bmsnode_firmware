@@ -136,6 +136,16 @@ static bool cmd_addr(packet_t *pkt)
     return false;
 }
 
+// implement STATUS command
+static bool cmd_status(void)
+{
+    uint8_t pld[2];
+    uint16_t mvolts = adc_get_cellmv();
+    pld[0] = mvolts;
+    pld[1] = mvolts >> 8;
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, 2);
+}
+
 // implement ADCRAW command
 static bool cmd_adcraw(void)
 {
@@ -213,6 +223,10 @@ bool cmd_process(void)
 
                 case CMD_ADCRAW:
                     ret = cmd_adcraw();
+                    break;
+
+                case CMD_STATUS:
+                    ret = cmd_status();
                     break;
 
                 default:

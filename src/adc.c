@@ -108,3 +108,16 @@ uint16_t *adc_get_raw(void)
 {
     return results;
 }
+
+// return the cell voltage in millivolts
+uint16_t adc_get_cellmv(void)
+{
+    // cell voltage scaler value
+    // derived from Vref and voltage divider
+    // (Vref/1023) * ((475+402)/402) * 1024
+    // 1024 multiplier lets us use base16 integer math
+    // myConfig.cellVscale = 4472;
+    uint32_t mv1024 = (uint32_t)results[0] * (uint32_t)4472U;
+    mv1024 /= 1024U;
+    return (uint16_t)mv1024;
+}

@@ -60,6 +60,13 @@
  */
 #define CMD_ADCRAW 5
 
+/**
+ * STATUS command code
+ *
+ * Returns BMS Node status (such as voltage, temp, etc. - see spec)
+ */
+#define CMD_STATUS 6
+
 #ifdef __cplusplus
 extern "C" {
 #endif

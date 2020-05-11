@@ -179,3 +179,33 @@ the cell voltage sample.
 
 The length of this response packet could increase in the future if more analog
 samples are collected. However, it should remain backwards-compatible.
+
+STATUS (6)
+----------
+
+### Version Notes
+
+Introduced in `0.5`.
+
+### Command
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 6    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Response
+
+With reply bit:
+
+|Byte    |Usage                                     |
+|--------|------------------------------------------|
+|CMD     | 6                                        |
+|LEN     | 2                                        |
+|PLD[1:0]| Cell voltage millivolts, little-endian   |
+
+### Description
+
+The STATUS command is used to retrieve operating data from the BMS Node.
+This command is WIP and subject to change.

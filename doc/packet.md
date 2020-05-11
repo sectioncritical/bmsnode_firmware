@@ -98,6 +98,8 @@ of the responding node.
 |  2 | DFU     | enter device firmware update mode |
 |  3 | UID     | discover board unique ID (see notes in command spec)|
 |  4 | ADDR    | set board bus address             |
+|  5 | ADCRAW  | read raw ADC sample data          |
+|  6 | STATUS  | read BMS node status              |
 
 See [Command Specification](command.md) for command details.
 

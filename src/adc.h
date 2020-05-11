@@ -70,6 +70,13 @@ extern void adc_powerdown(void);
 extern void adc_sample(void);
 
 /**
+ * Return the cell voltage in millivolts.
+ *
+ * @return the cell voltage as unsigned 16-bit, in units of millivolts
+ */
+extern uint16_t adc_get_cellmv(void);
+
+/**
  * Return the raw ADC data in an array.
  *
  * The number of samples is defined by `ADC_NUM_CHANNELS` and is currently,
