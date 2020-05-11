@@ -140,3 +140,42 @@ address to different nodes on the same bus. This behavior makes it possible for
 a controller to assign bus addresses to all devices on a bus without regard
 to any already-assigned bus addresses. To do this, the controller must know
 the UID of all devices on the bus.
+
+ADCRAW (5)
+----------
+
+### Version Notes
+
+Introduced in `0.5`.
+
+### Command
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 5    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Response
+
+With reply bit:
+
+|Byte    |Usage                         |
+|--------|------------------------------|
+|CMD     | 5                            |
+|LEN     | 6                            |
+|PLD[1:0]| Cell voltage sample data     |
+|PLD[3:2]| Onboard thermistor sample    |
+|PLD[5:4]| External sensor sample       |
+
+### Description
+
+The ADCRAW command is used to retrieve the raw sample data from the ADC module.
+The data is 10-bit unsigned, stored in two 8-bit values. The data is little-
+endian. For example PLD[0] is the lower byte and PLD[1] is the upper byte of
+the cell voltage sample.
+
+### Notes
+
+The length of this response packet could increase in the future if more analog
+samples are collected. However, it should remain backwards-compatible.

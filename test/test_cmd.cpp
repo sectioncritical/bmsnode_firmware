@@ -52,6 +52,8 @@ FAKE_VALUE_FUNC(uint32_t, cfg_uid);
 FAKE_VALUE_FUNC(uint8_t, cfg_board_type);
 FAKE_VOID_FUNC(cfg_store, config_t *);
 
+FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
+
 config_t *nodecfg;
 
 }

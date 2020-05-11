@@ -40,6 +40,7 @@
 #include "cfg.h"
 #include "pkt.h"
 #include "tmr.h"
+#include "adc.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -57,13 +58,13 @@
  * |  A1  | 12  | AO | UART0 TX                           |
  * |  A2  | 11  | AI | UART0 RX                           |
  * |  A3  | 10  | O  | GPIO load enable                   |
- * |  A4  |  9  | AI | ADC internal temp sensor (ISP SCK) |
+ * |  A4  |  9  | AI | ADC4 internal temp sensor (ISP SCK)|
  * |  A5  |  8  | O  | GPIO blue LED (ISP MISO)           |
  * |  A6  |  7  | O  | GPIO green LED (ISP MOSI)          |
  * |  A7  |  6  | O  | GPIO ref enable (needs high drive) |
- * |  B0  |  2  | AI | ADC external temp sensor           |
+ * |  B0  |  2  | AI | ADC11 external temp sensor         |
  * |  B1  |  3  | I/O| GPIO spare external                |
- * |  B2  |  5  | AI | ADC cell voltage                   |
+ * |  B2  |  5  | AI | ADC8 cell voltage                  |
  * |  B3  |  4  | AI | reset (pulled up)                  |
  *
  */
@@ -112,6 +113,7 @@ void main_loop(void)
     static uint16_t blink_timeout;
     static uint16_t sleep_timeout;
     static uint16_t blink_period;
+    static uint16_t adc_timeout;
 
     cli(); // should already be disabled, just to be sure
     MCUSR = 0; // this has to be done here in order to disable WDT
@@ -156,6 +158,8 @@ void main_loop(void)
     // turn on blue LED at the start
     PORTA |= _BV(PORTA5);
 
+    adc_powerup();  // power up ADC circuitry
+
     // do an initial blink for 5 seconds
     // with 50 ms toggle
     // rapid toggle means bms node is starting up
@@ -181,6 +185,7 @@ void main_loop(void)
     blink_timeout = tmr_set(blink_period);
     sleep_timeout = tmr_set(1000);
     appstate_t state = STATE_IDLE;
+    adc_timeout = tmr_set(1);   // perform first conversion right away
 
     // blinky loop
     while (1)
@@ -190,6 +195,13 @@ void main_loop(void)
         {
             blink_timeout += blink_period;
             PORTA ^= _BV(PORTA5);
+        }
+
+        // run adc conversions
+        if (tmr_expired(adc_timeout))
+        {
+            adc_timeout += 100;
+            adc_sample();
         }
 
         // run the command processor
@@ -249,6 +261,8 @@ void main_loop(void)
             // SLEEP - going into sleep state to save power
             // will remain in this state until waken by serial event
             case STATE_SLEEP:
+                adc_powerdown();    // shut down analog circuits
+
                 // force LED outputs off
                 PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
                 // disable the UART TX (for power saving)
@@ -268,9 +282,11 @@ void main_loop(void)
                 // returns us to idle state
 
             default:
+                adc_powerup();          // turn on the analog circuits
                 blink_period = 200;
                 blink_timeout = tmr_set(blink_period);
                 sleep_timeout = tmr_set(1000);
+                adc_timeout = tmr_set(4); // allow some settling time
                 state = STATE_IDLE;
                 break;
         }

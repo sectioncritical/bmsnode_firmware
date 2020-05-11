@@ -33,6 +33,7 @@
 #include "pkt.h"
 #include "cmd.h"
 #include "cfg.h"
+#include "adc.h"
 #include "ver.h"
 
 //////////
@@ -135,6 +136,20 @@ static bool cmd_addr(packet_t *pkt)
     return false;
 }
 
+// implement ADCRAW command
+static bool cmd_adcraw(void)
+{
+    uint8_t pld[6];
+    uint16_t *p_results = adc_get_raw();
+    pld[0] = p_results[0];
+    pld[1] = p_results[0] >> 8;
+    pld[2] = p_results[1];
+    pld[3] = p_results[1] >> 8;
+    pld[4] = p_results[2];
+    pld[5] = p_results[2] >> 8;
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADCRAW, pld, 6);
+}
+
 static bool b_dfu_pending = false;
 
 // check if there was a recent dfu command
@@ -194,6 +209,10 @@ bool cmd_process(void)
 
                 case CMD_UID:
                     ret = cmd_uid();
+                    break;
+
+                case CMD_ADCRAW:
+                    ret = cmd_adcraw();
                     break;
 
                 default:

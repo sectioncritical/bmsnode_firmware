@@ -277,6 +277,68 @@ def uid(serport, addr, verbose=False):
     print("")
     serport.timeout = saved_timeout
 
+def adcraw(serport, addr, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    pkt = NodePacket(address=addr, command=5)
+    pkt.serport = serport
+    pkt.verbose = verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 5 and rpkt.reply:
+                adc0 = rpkt.payload[0] | (rpkt.payload[1] << 8)
+                adc1 = rpkt.payload[2] | (rpkt.payload[3] << 8)
+                adc2 = rpkt.payload[4] | (rpkt.payload[5] << 8)
+                print("")
+                print("Raw ADC data for node", addr)
+                print("")
+                print("cell        : 0x{:03X} {:4d}".format(adc0, adc0))
+                print("thermistor  : 0x{:03X} {:4d}".format(adc1, adc1))
+                print("sensor      : 0x{:03X} {:4d}".format(adc2, adc2))
+                print("")
+                break
+        else:
+            print("no reply")
+            break
+
+    print("")
+    serport.timeout = saved_timeout
+
+def status(serport, addr, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    pkt = NodePacket(address=addr, command=6)
+    pkt.serport = serport
+    pkt.verbose = verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 6 and rpkt.reply:
+                mvolts = rpkt.payload[0] | (rpkt.payload[1] << 8)
+                print("")
+                print("Cell voltage {:4} mV".format(mvolts))
+                print("")
+                break
+        else:
+            print("no reply")
+            break
+
+    print("")
+    serport.timeout = saved_timeout
+
 def setaddr(serport, addr, uid, verbose=False):
     # validate the UID format first
     r = re.compile("^[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}-[0-9a-zA-Z]{2}$")
@@ -332,6 +394,12 @@ def cli():
     puid = subp.add_parser("uid", help="Get device UID")
     puid.add_argument('-a', "--address", type=int, default=0, help="device address to query (0)")
 
+    padc = subp.add_parser("adc", help="Get raw ADC values")
+    padc.add_argument('-a', "--address", type=int, default=0, help="device address to query (0)")
+
+    psts = subp.add_parser("status", help="Get node status")
+    psts.add_argument('-a', "--address", type=int, default=0, help="device address to query (0)")
+
     paddr = subp.add_parser("addr", help="Set device address")
     paddr.add_argument('-a', "--address", type=int, required=True, help="new bus address for device")
     paddr.add_argument('-u', "--uid", type=str, required=True, help="UID of device to set")
@@ -353,6 +421,14 @@ def cli():
     elif args.cmdname == "addr":
         flush_bus(ser)
         setaddr(ser, args.address, args.uid, verbose=args.verbose)
+
+    elif args.cmdname == "adc":
+        flush_bus(ser)
+        adcraw(ser, args.address, verbose = args.verbose)
+
+    elif args.cmdname == "status":
+        flush_bus(ser)
+        status(ser, args.address, verbose = args.verbose)
 
 """
     pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")

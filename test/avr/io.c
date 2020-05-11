@@ -23,6 +23,13 @@ volatile uint8_t OCR0A = 0;
 volatile uint8_t TIMSK0 = 0;
 volatile uint8_t ACSR0A = 0;
 volatile uint8_t ACSR1A = 0;
+volatile uint8_t ADMUXA = 0;
+volatile uint8_t ADMUXB = 0;
+volatile uint8_t ADCH = 0;
+volatile uint8_t ADCL = 0;
+volatile uint8_t ADCSRA = 0;
+volatile uint8_t DIDR0 = 0;
+volatile uint8_t DIDR1 = 0;
 
 volatile bool global_int_flag = false;
 

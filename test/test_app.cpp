@@ -53,6 +53,9 @@ FAKE_VOID_FUNC(wdt_disable);
 FAKE_VOID_FUNC(tmr_init);
 FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
 FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
+FAKE_VOID_FUNC(adc_powerup);
+FAKE_VOID_FUNC(adc_powerdown);
+FAKE_VOID_FUNC(adc_sample);
 }
 
 bool test_exit = false;

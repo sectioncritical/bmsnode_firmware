@@ -22,73 +22,19 @@
  * IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __CMD_H__
-#define __CMD_H__
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-/**
- * PING command code
- *
- * Causes a ping reply packets to be sent.
- */
-#define CMD_PING 1
+#include <avr/io.h> // special test version of header
 
-/**
- * DFU command code
- *
- * Causes the node to enter DFU (firmware update) mode.
- */
-#define CMD_DFU 2
+#include "catch.hpp"
+#include "adc.h"
 
-/**
- * UID command code
- *
- * Causes node to report UID and board type.
- */
-#define CMD_UID 3
-
-/**
- * ADDR command code
- *
- * Sets device bus address
- */
-#define CMD_ADDR 4
-
-/**
- * ADCRAW command code
- *
- * Reads ADC raw sample data
- */
-#define CMD_ADCRAW 5
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * Run the command processor.
- *
- * This function should be called periodically from the main loop. It checks
- * for any available incoming packets. It checks if the packets is intended
- * for this node. If so then it dispatches the command for further processing
- * according to its function.
- *
- * @return returns `true` if a command was processed and `false` if not.
- */
-extern bool cmd_process(void);
-
-/**
- * Check if there was a DFU command.
- *
- * If a DFU command (for any node) has occurred since the last time this was
- * called, it iwll return `true`. It returns true only once per received DFU
- * command.
- *
- * @return true if a DFU command has been received since last check.
- */
-extern bool cmd_was_dfu(void);
-
-#ifdef __cplusplus
+TEST_CASE("powerup")
+{
+    adc_powerup();
+    SUCCEED("placeholder");
 }
-#endif
 
-#endif

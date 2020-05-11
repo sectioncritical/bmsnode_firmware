@@ -62,6 +62,7 @@ OBJS+=$(OUT)/cmd.o
 OBJS+=$(OUT)/ser.o
 OBJS+=$(OUT)/cfg.o
 OBJS+=$(OUT)/tmr.o
+OBJS+=$(OUT)/adc.o
 OBJS+=$(OUT)/ver.o
 
 # to run the versioning tool we need to switch around to different

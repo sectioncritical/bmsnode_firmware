@@ -111,6 +111,21 @@ extern volatile uint8_t MCUSR;
 extern volatile uint8_t ACSR0A;
 extern volatile uint8_t ACSR1A;
 
+// ADC
+
+extern volatile uint8_t ADMUXA;
+extern volatile uint8_t ADMUXB;
+extern volatile uint8_t ADCH;
+extern volatile uint8_t ADCL;
+extern volatile uint8_t ADCSRA;
+#define ADEN        (7)
+#define ADSC        (6)
+extern volatile uint8_t DIDR0;
+#define ADC4D       (4)
+extern volatile uint8_t DIDR1;
+#define ADC8D       (2)
+#define ADC11D      (0)
+
 #ifdef __cplusplus
 }
 #endif
