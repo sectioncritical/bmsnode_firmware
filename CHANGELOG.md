@@ -4,6 +4,15 @@
 
 <!--- next entry here -->
 
+## 0.5.0
+2020-05-12
+
+### Features
+
+- **adc:** add ADC module and raw data command #30 (f54f3d8220b40a6d46f51ec2dd0f208da26961f3)
+- **adc:** add cell voltage reading and status command #8 (eb28af8a6532122f4918185804e6b2a0c583f189)
+- **adc:** add temp sensor reading to status command #9 (99f7ec45b99799685282a7c15080c55ec3ed6728)
+
 ## 0.4.0
 2020-05-10
 
