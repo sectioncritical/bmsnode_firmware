@@ -56,6 +56,8 @@ FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
 FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
+FAKE_VOID_FUNC(swreset);
+
 config_t *nodecfg;
 
 }
@@ -134,7 +136,66 @@ TEST_CASE("command processor")
         CHECK(pkt_rx_free_fake.arg0_val == pkt);
     }
 
-    // TODO: add some payload test cases
+    SECTION("last cmd ping to us")
+    {
+        uint8_t lastcmd = cmd_get_last(); // flush old data
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+
+        packet_t *pkt = &pkt_ping;
+        pkt_ready_fake.return_val = pkt;
+        pkt_send_fake.return_val = true;
+        bool ret = cmd_process();
+        REQUIRE(pkt_ready_fake.call_count == 1);
+        REQUIRE(ret);
+
+        // the above verifies the ping packet was processed
+        // no need to check payload
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == CMD_PING);
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+    }
+
+    SECTION("last cmd ping to other node")
+    {
+        uint8_t lastcmd = cmd_get_last(); // flush old data
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+
+        packet_t *pkt = &pkt_ping;
+        pkt->addr = 99; // valid but non-existing address
+        pkt_ready_fake.return_val = pkt;
+        pkt_send_fake.return_val = true;
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK_FALSE(ret); // not addressed to us
+
+        // last cmd should be 0
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+    }
+
+    SECTION("last cmd dfu to other node")
+    {
+        uint8_t lastcmd = cmd_get_last(); // flush old data
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+
+        packet_t *pkt = &pkt_ping;
+        pkt->cmd = CMD_DFU;
+        pkt->addr = 99; // valid but non-existing address
+        pkt_ready_fake.return_val = pkt;
+        pkt_send_fake.return_val = true;
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK_FALSE(ret); // not addressed to us
+
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == CMD_DFU);
+        lastcmd = cmd_get_last();
+        CHECK(lastcmd == 0);
+    }
 }
 
 static uint8_t pkt_send_payload_len = 0;
@@ -378,5 +439,232 @@ TEST_CASE("ADDR command")
         // verify pkt_rx_free() was called
         CHECK(pkt_rx_free_fake.call_count == 1);
         CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+}
+
+TEST_CASE("STATUS command")
+{
+    config_t testcfg = { 0, 0, 0, 0 };
+    nodecfg = &testcfg;
+
+    RESET_FAKE(pkt_ready);
+    RESET_FAKE(pkt_send);
+    RESET_FAKE(pkt_rx_free);
+
+    RESET_FAKE(adc_get_cellmv);
+    RESET_FAKE(adc_get_tempC);
+
+    // reset the payload capture from pkt_send
+    memset(pkt_send_payload, 0, 64);
+    pkt_send_payload_len = 0;
+
+    pkt_send_fake.custom_fake = pkt_send_custom_fake;
+
+    testcfg.addr = 1; // device addr 1
+
+    packet_t pkt = { 0, 1, CMD_STATUS, 0 };
+    pkt_ready_fake.return_val = &pkt;
+    pkt_send_fake.return_val = true;
+
+    SECTION("cell voltage and temperature")
+    {
+        // this cmd is going to call adc_get_cellmv() and adc_get_tempC()
+        adc_get_cellmv_fake.return_val = 3456;
+        adc_get_tempC_fake.return_val = 31; // 31 C
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called adc_get_cellmv() and adc_get_tempC()
+        CHECK(adc_get_cellmv_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 1);
+
+        // check STATUS reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
+        CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 4);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload[0] == 0x80); // 0xD80 = 3456d
+        CHECK(pkt_send_payload[1] == 0x0D);
+        CHECK(pkt_send_payload[2] == 0x1F);
+        CHECK(pkt_send_payload[3] == 0x0);  // 0x001F = 31d
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+
+    SECTION("temperature > 8 bits")
+    {
+        // this cmd is going to call adc_get_cellmv() and adc_get_tempC()
+        adc_get_cellmv_fake.return_val = 4215;
+        adc_get_tempC_fake.return_val = 300; // 300 C
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called adc_get_cellmv() and adc_get_tempC()
+        CHECK(adc_get_cellmv_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 1);
+
+        // check STATUS reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
+        CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 4);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload[0] == 0x77);
+        CHECK(pkt_send_payload[1] == 0x10);
+        CHECK(pkt_send_payload[2] == 0x2C);
+        CHECK(pkt_send_payload[3] == 0x01);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+
+    SECTION("negative temperature")
+    {
+        // this cmd is going to call adc_get_cellmv() and adc_get_tempC()
+        adc_get_cellmv_fake.return_val = 4215;
+        adc_get_tempC_fake.return_val = -25;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called adc_get_cellmv() and adc_get_tempC()
+        CHECK(adc_get_cellmv_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 1);
+
+        // check STATUS reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
+        CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 4);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload[0] == 0x77);
+        CHECK(pkt_send_payload[1] == 0x10);
+        CHECK(pkt_send_payload[2] == 0xE7);
+        CHECK(pkt_send_payload[3] == 0xFF);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+}
+
+TEST_CASE("ADCRAW command")
+{
+    config_t testcfg = { 0, 0, 0, 0 };
+    nodecfg = &testcfg;
+
+    RESET_FAKE(pkt_ready);
+    RESET_FAKE(pkt_send);
+    RESET_FAKE(pkt_rx_free);
+
+    RESET_FAKE(adc_get_raw);
+
+    // reset the payload capture from pkt_send
+    memset(pkt_send_payload, 0, 64);
+    pkt_send_payload_len = 0;
+
+    pkt_send_fake.custom_fake = pkt_send_custom_fake;
+
+    testcfg.addr = 1; // device addr 1
+
+    packet_t pkt = { 0, 1, CMD_ADCRAW, 0 };
+    pkt_ready_fake.return_val = &pkt;
+    pkt_send_fake.return_val = true;
+
+    SECTION("raw ADC values")
+    {
+        // this cmd is going to call adc_get_raw()
+        uint16_t adcdata[3] = { 0x1234, 0x5678, 0xABCD };
+        adc_get_raw_fake.return_val = adcdata;
+
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK(ret);
+
+        // should have called adc_get_raw()
+        CHECK(adc_get_raw_fake.call_count == 1);
+
+        // check STATUS reply packet contents
+        REQUIRE(pkt_send_fake.call_count == 1);
+        CHECK(pkt_send_fake.arg0_val == PKT_FLAG_REPLY);
+        CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
+        CHECK(pkt_send_fake.arg2_val == CMD_ADCRAW);
+        REQUIRE(pkt_send_fake.arg3_val);
+        CHECK(pkt_send_fake.arg4_val == 6);
+
+        // check payload
+        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload[0] == 0x34);
+        CHECK(pkt_send_payload[1] == 0x12);
+        CHECK(pkt_send_payload[2] == 0x78);
+        CHECK(pkt_send_payload[3] == 0x56);
+        CHECK(pkt_send_payload[4] == 0xCD);
+        CHECK(pkt_send_payload[5] == 0xAB);
+
+        // verify pkt_rx_free() was called
+        CHECK(pkt_rx_free_fake.call_count == 1);
+        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
+    }
+}
+
+TEST_CASE("DFU command")
+{
+    config_t testcfg = { 0, 0, 0, 0 };
+    nodecfg = &testcfg;
+
+    RESET_FAKE(pkt_ready);
+    RESET_FAKE(pkt_send);
+    RESET_FAKE(pkt_rx_free);
+
+    RESET_FAKE(swreset);
+
+    // reset the payload capture from pkt_send
+    memset(pkt_send_payload, 0, 64);
+    pkt_send_payload_len = 0;
+
+    pkt_send_fake.custom_fake = pkt_send_custom_fake;
+
+    testcfg.addr = 1; // device addr 1
+
+    packet_t pkt = { 0, 1, CMD_DFU, 0 };
+    pkt_ready_fake.return_val = &pkt;
+    pkt_send_fake.return_val = true;
+
+    SECTION("DFU to this node")
+    {
+        // send the command packet
+        bool ret = cmd_process();
+        CHECK(pkt_ready_fake.call_count == 1);
+        CHECK_FALSE(ret); // DFU command returns false no matter what
+
+        // should have called swreset()
+        CHECK(swreset_fake.call_count == 1);
+
+        // TODO: check all the register?? probably not necessary
     }
 }

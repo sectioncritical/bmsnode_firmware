@@ -84,15 +84,17 @@ extern "C" {
 extern bool cmd_process(void);
 
 /**
- * Check if there was a DFU command.
+ * Get the last command that was processed.
  *
- * If a DFU command (for any node) has occurred since the last time this was
- * called, it iwll return `true`. It returns true only once per received DFU
- * command.
+ * This function can be called to discover that last command procedded by
+ * the command processor. This can be used by the main app loop to adjust
+ * operating state based on commands to this node. The last command will be
+ * cleared once this function is called.
  *
- * @return true if a DFU command has been received since last check.
+ * @return the command code of the last processed command, or 0 if there is
+ * no recent command.
  */
-extern bool cmd_was_dfu(void);
+extern uint8_t cmd_get_last(void);
 
 #ifdef __cplusplus
 }

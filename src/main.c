@@ -210,11 +210,17 @@ void main_loop(void)
         // processing per the current app state
         switch (state)
         {
+            uint8_t lastcmd;
+
             // IDLE - awake because of activity. remain in this state
             // until the sleep timeout expires or dfu happens
             case STATE_IDLE:
+                // check the last command and see if we need to change the
+                // operating state
+                lastcmd = cmd_get_last();
+
                 // if last command was DFU, then go to the DFU state
-                if (cmd_was_dfu())
+                if (lastcmd == CMD_DFU)
                 {
                     // set a longer sleep timeout for dfu mode,
                     // and update the blink indicator rate

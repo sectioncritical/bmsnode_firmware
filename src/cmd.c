@@ -55,7 +55,11 @@ typedef union
     uint8_t u8[4];
 } u32buf_t;
 
+#ifndef UNIT_TEST // cant call through null function pointer during unit test
 static void(*swreset)(void) = 0;
+#else
+extern void swreset(void);
+#endif
 
 // implement PING command
 static bool cmd_ping(void)
@@ -163,16 +167,13 @@ static bool cmd_adcraw(void)
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADCRAW, pld, 6);
 }
 
-static bool b_dfu_pending = false;
+static uint8_t last_cmd = 0;
 
-// check if there was a recent dfu command
-bool cmd_was_dfu(void)
+// return the last command received
+uint8_t cmd_get_last(void)
 {
-    bool ret = b_dfu_pending;
-    if (b_dfu_pending)
-    {
-        b_dfu_pending = false;
-    }
+    uint8_t ret = last_cmd;
+    last_cmd = 0;
     return ret;
 }
 
@@ -189,7 +190,7 @@ bool cmd_process(void)
         // this is used by app main loop
         if (pkt->cmd == CMD_DFU)
         {
-            b_dfu_pending = true;
+            last_cmd = CMD_DFU;
         }
 
         // process ADDR command for any address
@@ -210,6 +211,10 @@ bool cmd_process(void)
         // we have a nodeid so process normally
         else if (pkt->addr == NODEID)
         {
+            // for a command addressed to this node, save the command
+            // for later query
+            last_cmd = pkt->cmd;
+
             switch (pkt->cmd)
             {
                 case CMD_PING:

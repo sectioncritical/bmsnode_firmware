@@ -3,3 +3,5 @@ provisioning/
 vertool
 next-version
 *.tar.gz
+bmsnode-*
+buildlog.txt

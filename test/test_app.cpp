@@ -42,7 +42,7 @@ extern "C" {
 
 FAKE_VALUE_FUNC(config_t *, cfg_load);
 FAKE_VALUE_FUNC(bool, cmd_process);
-FAKE_VALUE_FUNC(bool, cmd_was_dfu);
+FAKE_VALUE_FUNC(uint8_t, cmd_get_last);
 FAKE_VALUE_FUNC(bool, pkt_is_active);
 FAKE_VOID_FUNC(pkt_reset);
 FAKE_VOID_FUNC(ser_flush);
