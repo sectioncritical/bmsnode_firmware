@@ -36,7 +36,7 @@ SER_OBJS=test_main.o test_ser.o ser.o io.o
 CMD_OBJS=test_main.o test_cmd.o cmd.o io.o crc16.o ver.o
 CFG_OBJS=test_main.o test_cfg.o cfg.o crc16.o
 TMR_OBJS=test_main.o test_tmr.o tmr.o io.o
-ADC_OBJS=test_main.o test_adc.o adc.o io.o
+ADC_OBJS=test_main.o test_adc.o adc.o io.o thermistor_table.o
 
 TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))

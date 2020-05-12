@@ -54,6 +54,7 @@ FAKE_VOID_FUNC(cfg_store, config_t *);
 
 FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
+FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
 config_t *nodecfg;
 

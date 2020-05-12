@@ -26,6 +26,7 @@
 
 #include <avr/io.h>
 
+#include "thermistor_table.h"
 #include "adc.h"
 
 // channel map - mux channels to sample
@@ -120,4 +121,10 @@ uint16_t adc_get_cellmv(void)
     uint32_t mv1024 = (uint32_t)results[0] * (uint32_t)4472U;
     mv1024 /= 1024U;
     return (uint16_t)mv1024;
+}
+
+// return the thermistor temperature in C
+int16_t adc_get_tempC(void)
+{
+    return adc_to_temp(results[1]);
 }

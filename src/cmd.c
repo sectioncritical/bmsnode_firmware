@@ -139,11 +139,14 @@ static bool cmd_addr(packet_t *pkt)
 // implement STATUS command
 static bool cmd_status(void)
 {
-    uint8_t pld[2];
+    uint8_t pld[4];
     uint16_t mvolts = adc_get_cellmv();
     pld[0] = mvolts;
     pld[1] = mvolts >> 8;
-    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, 2);
+    int16_t tempC = adc_get_tempC();
+    pld[2] = tempC;
+    pld[3] = tempC >> 8;
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, 4);
 }
 
 // implement ADCRAW command

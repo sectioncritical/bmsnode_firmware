@@ -328,8 +328,10 @@ def status(serport, addr, verbose=False):
         if rpkt:
             if rpkt.address == addr and rpkt.command == 6 and rpkt.reply:
                 mvolts = rpkt.payload[0] | (rpkt.payload[1] << 8)
+                tempc = rpkt.payload[2] | (rpkt.payload[3] << 8)
                 print("")
                 print("Cell voltage {:4} mV".format(mvolts))
+                print("Temperature  {:4} C".format(tempc))
                 print("")
                 break
         else:

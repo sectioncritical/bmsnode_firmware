@@ -77,6 +77,13 @@ extern void adc_sample(void);
 extern uint16_t adc_get_cellmv(void);
 
 /**
+ * Return the onboard temperature in C.
+ *
+ * @return the onboard thermistor temperature in C, 16-bit signed.
+ */
+extern int16_t adc_get_tempC(void);
+
+/**
  * Return the raw ADC data in an array.
  *
  * The number of samples is defined by `ADC_NUM_CHANNELS` and is currently,

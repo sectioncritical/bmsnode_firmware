@@ -202,8 +202,9 @@ With reply bit:
 |Byte    |Usage                                     |
 |--------|------------------------------------------|
 |CMD     | 6                                        |
-|LEN     | 2                                        |
+|LEN     | 4                                        |
 |PLD[1:0]| Cell voltage millivolts, little-endian   |
+|PLD[3:2]| Temperature in C, signed, little-endian  |
 
 ### Description
 
