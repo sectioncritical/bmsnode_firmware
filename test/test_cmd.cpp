@@ -56,6 +56,8 @@ FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
 FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
+FAKE_VALUE_FUNC(bool, shunt_is_on);
+FAKE_VALUE_FUNC(uint8_t, shunt_fault);
 FAKE_VOID_FUNC(swreset);
 
 config_t *nodecfg;
@@ -487,10 +489,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 4);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x80); // 0xD80 = 3456d
         CHECK(pkt_send_payload[1] == 0x0D);
         CHECK(pkt_send_payload[2] == 0x1F);
@@ -522,10 +524,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 4);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0x2C);
@@ -557,10 +559,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 4);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 4);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0xE7);

@@ -100,6 +100,8 @@ of the responding node.
 |  4 | ADDR    | set board bus address             |
 |  5 | ADCRAW  | read raw ADC sample data          |
 |  6 | STATUS  | read BMS node status              |
+|  7 | SHUNTON | turn on shunting                  |
+|  8 | SHUNTOFF| turn off shunting                 |
 
 See [Command Specification](command.md) for command details.
 

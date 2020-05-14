@@ -146,7 +146,9 @@ ADCRAW (5)
 
 ### Version Notes
 
-Introduced in `0.5`.
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.5` |command introduced         |
 
 ### Command
 
@@ -185,7 +187,10 @@ STATUS (6)
 
 ### Version Notes
 
-Introduced in `0.5`.
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.5` |command introduced         |
+| `0.6` |added shunt flag and fault |
 
 ### Command
 
@@ -202,11 +207,92 @@ With reply bit:
 |Byte    |Usage                                     |
 |--------|------------------------------------------|
 |CMD     | 6                                        |
-|LEN     | 4                                        |
+|LEN     | 6                                        |
 |PLD[1:0]| Cell voltage millivolts, little-endian   |
 |PLD[3:2]| Temperature in C, signed, little-endian  |
+|PLD[4]  | Shunt status: 1-on, 0-off                |
+|PLD[5]  | Shunt fault - reason for last shunt exit |
 
 ### Description
 
 The STATUS command is used to retrieve operating data from the BMS Node.
 This command is WIP and subject to change.
+
+The shunt fault field is a code that indicates why the shunt mode was stopped.
+This is **WIP** (work-in-progress) and subject to change in the future. After
+reading the value once, it will be reset to 0 in future readings until the
+shunt mode is used again.
+
+|Fault Code|Reason                                              |
+|----------|----------------------------------------------------|
+| 0        |OK - operating normally                             |
+| 1        |OFF - turned off                                    |
+| 2        |TIMEOUT - max duration expired                      |
+| 3        |UNDERVOLT - cell voltage dropped below threshold    |
+| 4        |OVERTEMP - maximum temperature exceeded             |
+
+SHUNTON (7)
+-----------
+
+### Version Notes
+
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.6` |command introduced         |
+
+### Command
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 7    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 7    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Description
+
+Turns on the BMS Node cell shunting mode (balancing mode). The BMS Node will
+turn on the shunting resistors and drain energy from the cell. This will
+continue until the cell voltage drops below the shunt cutoff limit, or the
+temperature exceeds a temperature cutoff limit. The node will automatically
+exit shunt mode if these conditions occur.
+
+SHUNTOFF (8)
+------------
+
+### Version Notes
+
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.6` |command introduced         |
+
+### Command
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 8    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 8    |
+|LEN    | 0    |
+|PLD    | None |
+
+### Description
+
+Turns off the BMS Node cell shunting mode (balancing mode).

@@ -67,6 +67,20 @@
  */
 #define CMD_STATUS 6
 
+/**
+ * SHUNTON command code
+ *
+ * Turns on cell shunting (balancing mode).
+ */
+#define CMD_SHUNTON 7
+
+/**
+ * SHUNTOFF command code
+ *
+ * Turns off cell shunting (balancing mode).
+ */
+#define CMD_SHUNTOFF 8
+
 #ifdef __cplusplus
 extern "C" {
 #endif

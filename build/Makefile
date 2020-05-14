@@ -65,6 +65,7 @@ OBJS+=$(OUT)/tmr.o
 OBJS+=$(OUT)/adc.o
 OBJS+=$(OUT)/ver.o
 OBJS+=$(OUT)/thermistor_table.o
+OBJS+=$(OUT)/shunt.o
 
 # to run the versioning tool we need to switch around to different
 # directories. So it is handy to be able to refer to directopries and files

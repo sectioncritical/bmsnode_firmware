@@ -312,6 +312,7 @@ def adcraw(serport, addr, verbose=False):
     serport.timeout = saved_timeout
 
 def status(serport, addr, verbose=False):
+    faultnames = [ "OK", "OFF", "TIMEOUT", "UNDERVOLT", "OVERTEMP" ]
     saved_timeout = serport.timeout
     serport.timeout = 1
 
@@ -329,9 +330,12 @@ def status(serport, addr, verbose=False):
             if rpkt.address == addr and rpkt.command == 6 and rpkt.reply:
                 mvolts = rpkt.payload[0] | (rpkt.payload[1] << 8)
                 tempc = rpkt.payload[2] | (rpkt.payload[3] << 8)
+                shunt_status = "ON" if rpkt.payload[4] == 1 else "off"
+                shunt_fault = rpkt.payload[5]
                 print("")
                 print("Cell voltage {:4} mV".format(mvolts))
                 print("Temperature  {:4} C".format(tempc))
+                print("Shunt         {:3} fault: {:s}".format(shunt_status, faultnames[shunt_fault]))
                 print("")
                 break
         else:
@@ -339,6 +343,31 @@ def status(serport, addr, verbose=False):
             break
 
     print("")
+    serport.timeout = saved_timeout
+
+def shunt(serport, addr, shunt_state, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    shunt_command = 7 if shunt_state == 1 else 8
+
+    pkt = NodePacket(address=addr, command=shunt_command)
+    pkt.serport = serport
+    pkt.verbose = verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == shunt_command and rpkt.reply:
+                break
+        else:
+            print("no reply")
+            break
+
     serport.timeout = saved_timeout
 
 def setaddr(serport, addr, uid, verbose=False):
@@ -406,6 +435,10 @@ def cli():
     paddr.add_argument('-a', "--address", type=int, required=True, help="new bus address for device")
     paddr.add_argument('-u', "--uid", type=str, required=True, help="UID of device to set")
 
+    pshunt = subp.add_parser("shunt", help="Turn shunt off or on")
+    pshunt.add_argument('-a', "--address", type=int, required=True, help="device address to set")
+    pshunt.add_argument('-s', "--state", type=int, required=True, help="0 or 1 (off or on)")
+
     args = parser.parse_args()
 
     if args.cmdname == "discover":
@@ -431,6 +464,10 @@ def cli():
     elif args.cmdname == "status":
         flush_bus(ser)
         status(ser, args.address, verbose = args.verbose)
+
+    elif args.cmdname == "shunt":
+        flush_bus(ser)
+        shunt(ser, args.address, shunt_state=args.state, verbose=args.verbose)
 
 """
     pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")

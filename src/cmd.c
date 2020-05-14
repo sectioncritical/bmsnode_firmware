@@ -35,6 +35,7 @@
 #include "cfg.h"
 #include "adc.h"
 #include "ver.h"
+#include "shunt.h"
 
 //////////
 //
@@ -61,10 +62,11 @@ static void(*swreset)(void) = 0;
 extern void swreset(void);
 #endif
 
-// implement PING command
-static bool cmd_ping(void)
+// implement command acknowledgement
+// (for commands that just need generic acknowledgement)
+static bool cmd_ack(packet_t *pkt)
 {
-    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_PING, NULL, 0);
+    return pkt_send(PKT_FLAG_REPLY, NODEID, pkt->cmd, NULL, 0);
 }
 
 // implement DFU command
@@ -143,14 +145,16 @@ static bool cmd_addr(packet_t *pkt)
 // implement STATUS command
 static bool cmd_status(void)
 {
-    uint8_t pld[4];
+    uint8_t pld[6];
     uint16_t mvolts = adc_get_cellmv();
     pld[0] = mvolts;
     pld[1] = mvolts >> 8;
     int16_t tempC = adc_get_tempC();
     pld[2] = tempC;
     pld[3] = tempC >> 8;
-    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, 4);
+    pld[4] = shunt_is_on() ? 1 : 0;
+    pld[5] = shunt_fault();
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, sizeof(pld));
 }
 
 // implement ADCRAW command
@@ -218,7 +222,7 @@ bool cmd_process(void)
             switch (pkt->cmd)
             {
                 case CMD_PING:
-                    ret = cmd_ping();
+                    ret = cmd_ack(pkt);
                     break;
 
                 case CMD_DFU:
@@ -235,6 +239,16 @@ bool cmd_process(void)
 
                 case CMD_STATUS:
                     ret = cmd_status();
+                    break;
+
+                // we could have a single shunt command with a parameter,
+                // or two separate shunt commands. The reason for the latter
+                // is that we only have mechanism to pass cmd code back to
+                // main app and not the parameters. This way is the easiest
+                // given the current design, and not any less code efficient.
+                case CMD_SHUNTON:
+                case CMD_SHUNTOFF:
+                    ret = cmd_ack(pkt);
                     break;
 
                 default:

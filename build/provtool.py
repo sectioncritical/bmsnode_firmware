@@ -1,4 +1,4 @@
-#!/usr/bin/evn python
+#!/usr/bin/env python
 
 import time
 import intelhex
@@ -85,6 +85,9 @@ if args.write:
 
         ih.tofile(hexfile, format="hex")
 
+        uidstr = '-'.join(format(x, "02X") for x in uidbytes)
+        print("Generated UID: {:s}".format(uidstr))
+
 elif args.read:
     with open(args.read, "r") as hexfile:
         ih = intelhex.IntelHex()
@@ -101,7 +104,7 @@ elif args.read:
         else:
             print("Board type  : {}".format(board[0]))
 
-        # readonable range for uid validation
+        # reasonable range for uid validation
         # apr 1 2020 through dec 2021
         min_uid = round(time.mktime((2020,  4,  1, 0, 0, 0, 0, 0, -1)))
         max_uid = round(time.mktime((2021, 12, 31, 0, 0, 0, 0, 0, -1)))

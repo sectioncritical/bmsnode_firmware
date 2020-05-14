@@ -41,6 +41,7 @@
 #include "pkt.h"
 #include "tmr.h"
 #include "adc.h"
+#include "shunt.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -104,7 +105,8 @@ typedef enum
 {
     STATE_IDLE,
     STATE_DFU,
-    STATE_SLEEP
+    STATE_SLEEP,
+    STATE_SHUNT
 } appstate_t;
 
 void main_loop(void)
@@ -205,20 +207,16 @@ void main_loop(void)
         }
 
         // run the command processor
+        // TODO: consider cmd_process() returning the last command
         bool b_processed = cmd_process();
+        uint8_t lastcmd = cmd_get_last();
 
         // processing per the current app state
         switch (state)
         {
-            uint8_t lastcmd;
-
             // IDLE - awake because of activity. remain in this state
             // until the sleep timeout expires or dfu happens
             case STATE_IDLE:
-                // check the last command and see if we need to change the
-                // operating state
-                lastcmd = cmd_get_last();
-
                 // if last command was DFU, then go to the DFU state
                 if (lastcmd == CMD_DFU)
                 {
@@ -228,6 +226,16 @@ void main_loop(void)
                     blink_period = 1000;
                     blink_timeout = tmr_set(blink_period);
                     state = STATE_DFU;
+                }
+
+                // if shunt command, switch to SHUNT state
+                else if (lastcmd == CMD_SHUNTON)
+                {
+                    shunt_start();
+                    state = STATE_SHUNT;
+                    // in shunt mode, WDT is used to ensure it never
+                    // gets stuck on
+                    wdt_enable(WDTO_1S);
                 }
 
                 // otherwise, monitor activity and wait for sleep timeout
@@ -264,13 +272,41 @@ void main_loop(void)
                 }
                 break;
 
+            // SHUNT - shunt is turned on and being monitored
+            case STATE_SHUNT:
+                wdt_reset();    // not dead yet
+
+                // check if commanded to shut if off
+                if (CMD_SHUNTOFF == lastcmd)
+                {
+                    shunt_stop();   // command it to stop
+                }
+
+                // run the shunt routine
+                // returns code if any monitor is tripped
+                shunt_status_t shunt_status = shunt_run();
+                if (SHUNT_OK != shunt_status)
+                {
+                    // shunt has been stopped for some reason
+                    // exit back to idle state
+                    blink_period = 200;
+                    blink_timeout = tmr_set(blink_period);
+                    sleep_timeout = tmr_set(1000);
+                    state = STATE_IDLE;
+
+                    // turn off the watchdog since we are exiting shunt mode
+                    MCUSR = 0;
+                    wdt_disable();
+                }
+                break;
+
             // SLEEP - going into sleep state to save power
             // will remain in this state until waken by serial event
             case STATE_SLEEP:
                 adc_powerdown();    // shut down analog circuits
 
                 // force LED outputs off
-                PORTA &= ~(_BV(PORTA5) | _BV(PORTA6));
+                PORTA &= ~(_BV(PORTA5) | _BV(PORTA6) | _BV(PORTA3));
                 // disable the UART TX (for power saving)
                 UCSR0B &= ~_BV(TXEN0);
 

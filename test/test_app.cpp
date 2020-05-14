@@ -30,6 +30,7 @@
 #include "catch.hpp"
 
 #include "cfg.h"
+#include "shunt.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by serial module.
@@ -50,12 +51,17 @@ FAKE_VALUE_FUNC(bool, ser_is_active);
 FAKE_VOID_FUNC(set_sleep_mode);
 FAKE_VOID_FUNC(sleep_mode);
 FAKE_VOID_FUNC(wdt_disable);
+FAKE_VOID_FUNC(wdt_reset);
+FAKE_VOID_FUNC(wdt_enable, uint16_t);
 FAKE_VOID_FUNC(tmr_init);
 FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
 FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
 FAKE_VOID_FUNC(adc_powerup);
 FAKE_VOID_FUNC(adc_powerdown);
 FAKE_VOID_FUNC(adc_sample);
+FAKE_VOID_FUNC(shunt_start);
+FAKE_VOID_FUNC(shunt_stop);
+FAKE_VALUE_FUNC(shunt_status_t, shunt_run);
 }
 
 bool test_exit = false;
