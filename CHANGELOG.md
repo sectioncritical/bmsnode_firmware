@@ -4,6 +4,17 @@
 
 <!--- next entry here -->
 
+## 0.6.0
+2020-05-15
+
+### Features
+
+- **shunt:** add shunt mode and command #11 (a8a202c0139a4c87c40041e19544bcace7367f80)
+
+### Fixes
+
+- **cmd:** add api to get last command processed ... (a88d2a6f46f03f2021295008bcc9e85d8d4e0b49)
+
 ## 0.5.0
 2020-05-12
 
