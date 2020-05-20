@@ -4,6 +4,13 @@
 
 <!--- next entry here -->
 
+## 0.6.1
+2020-05-20
+
+### Fixes
+
+- add doxygen docs generation, no functional change (#35) (19967ce43d8aff563b3bc85697bfbb9f2820b777)
+
 ## 0.6.0
 2020-05-15
 
