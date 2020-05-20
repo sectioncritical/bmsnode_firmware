@@ -25,6 +25,11 @@
 #ifndef __CFG_H__
 #define __CFG_H__
 
+/** @addtogroup cfg Config
+ *
+ * @{
+ */
+
 /**
  * Structure to hold the BMS Node configuration data.
  *
@@ -84,3 +89,5 @@ extern void cfg_store(config_t *cfg);
 #endif
 
 #endif
+
+/** @} */

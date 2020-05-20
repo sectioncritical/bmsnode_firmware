@@ -1,4 +1,4 @@
-BMSNode Blink Codes
+BMSNode Blink Codes {#blink}
 ===================
 
 TODO: this documents should be brought into a higher level app-level spec.

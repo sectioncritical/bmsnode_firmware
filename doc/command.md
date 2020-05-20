@@ -1,8 +1,8 @@
-BMSNode Command Specification
+BMSNode Command Specification {#command}
 =============================
 
 This document specifies the BMSNode commands and responses. For details about
-the packet format, see the [Packet Specification](packet.md).
+the packet format, see the [Packet Specification](packet).
 
 All commands are sent with the packet "reply" bit clear, and all responses have
 the reply bit set.
@@ -55,7 +55,8 @@ At this point it is awaiting boot loader commands. If no boot loader commands
 are received within a timeout period (4 seconds at the time of this writing),
 the the firmware restarts.
 
-The boot loader is arduino compatible [Optiboot](../build/optiboot/README.md)
+The boot loader is arduino compatible
+[Optiboot](https://gitlab.com/kroesche/bmsnode/-/blob/master/build/optiboot/README.md)
 and uses [avrdude](https://www.nongnu.org/avrdude/) as the programming
 utility.
 

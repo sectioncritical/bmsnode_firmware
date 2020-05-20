@@ -25,6 +25,11 @@
 #ifndef __SER_H__
 #define __SER_H__
 
+/** @addtogroup ser Serial
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -72,3 +77,5 @@ extern bool ser_is_active(void);
 #endif
 
 #endif
+
+/** @} */

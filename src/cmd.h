@@ -25,6 +25,11 @@
 #ifndef __CMD_H__
 #define __CMD_H__
 
+/** @addtogroup cmd Command
+ *
+ * @{
+ */
+
 /**
  * PING command code
  *
@@ -115,3 +120,5 @@ extern uint8_t cmd_get_last(void);
 #endif
 
 #endif
+
+/** @} */

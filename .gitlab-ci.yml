@@ -9,6 +9,8 @@ variables:
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
     BUILD_DIR: "build"
     TEST_DIR: "test"
+    DOC_DIR: "doc"
+    DOC_BUILD_DIR: "doc/build"
 
 cache:
     paths:
@@ -27,12 +29,16 @@ devbuild:
     script:
         - "make -C $BUILD_DIR clean"
         - "make -C $BUILD_DIR package"
+        - "make -C $DOC_BUILD_DIR clean"
+        - "make -C $DOC_BUILD_DIR"
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
             - "doc/license-badge.svg"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
+            - "$DOC_BUILD_DIR/firmware-docs.html"
+            - "$DOC_BUILD_DIR/html/"
 
 build:
     stage: build
@@ -44,12 +50,16 @@ build:
     script:
         - "make -C $BUILD_DIR clean"
         - "make -C $BUILD_DIR package PRODUCTION=1"
+        - "make -C $DOC_BUILD_DIR clean"
+        - "make -C $DOC_BUILD_DIR"
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
             - "doc/license-badge.svg"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
+            - "$DOC_BUILD_DIR/firmware-docs.html"
+            - "$DOC_BUILD_DIR/html/"
 
 test:
     stage: test

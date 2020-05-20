@@ -25,6 +25,11 @@
 #ifndef __SHUNT_H__
 #define __SHUNT_H__
 
+/** @addtogroup shunt Shunt
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -93,3 +98,5 @@ extern shunt_status_t shunt_run(void);
 #endif
 
 #endif
+
+/** @} */

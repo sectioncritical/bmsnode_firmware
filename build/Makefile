@@ -218,7 +218,7 @@ discover: venv
 
 .PHONY: cleantest
 cleantest:
-	make -C ../test clean
+	make -C ../test realclean
 
 # system should have python3 available as either python3 or python
 PY3?=$(shell command -v python3 || command -v python)

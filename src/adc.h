@@ -26,6 +26,12 @@
 #define __ADC_H__
 
 /**
+ * @addtogroup adc ADC
+ *
+ * @{
+ */
+
+/**
  * The number of ADC channels that are sampled by adc_sample(), and that
  * can be returned by adc_get_raw().
  */
@@ -107,3 +113,4 @@ extern uint16_t *adc_get_raw(void);
 #endif
 
 #endif
+/** @} */

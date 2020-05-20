@@ -1,4 +1,4 @@
-BMS Node Packet Specification
+BMS Node Packet Specification {#packet}
 =============================
 
 _This is very preliminary and WIP._
@@ -103,7 +103,7 @@ of the responding node.
 |  7 | SHUNTON | turn on shunting                  |
 |  8 | SHUNTOFF| turn off shunting                 |
 
-See [Command Specification](command.md) for command details.
+See [Command Specification](command) for command details.
 
 ### Length
 

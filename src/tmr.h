@@ -25,6 +25,11 @@
 #ifndef __TMR_H__
 #define __TMR_H__
 
+/** @addtogroup tmr Timer
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,7 +46,7 @@ extern void tmr_init(void);
  *
  * @return a value representing a future timeout value
  */
-extern uint16_t tmr_set(uint16_t millisec);
+extern uint16_t tmr_set(uint16_t duration);
 
 /**
  * Check if a previously set timer has expired.
@@ -57,3 +62,5 @@ extern bool tmr_expired(uint16_t tmrset);
 #endif
 
 #endif
+
+/** @} */

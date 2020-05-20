@@ -26,6 +26,12 @@
 #define __PKT_H__
 
 /**
+ * @addtogroup pkt Packet
+ *
+ * @{
+ */
+
+/**
  * Number of bytes in packet header
  */
 #define PKT_HEADER_LEN 4
@@ -40,12 +46,12 @@
  */
 typedef struct
 {
-    uint8_t flags;  //< flags definition TBD
-    uint8_t addr;   //< node address (0, 255 - reserved)
-    uint8_t cmd;    //< packet command code
-    uint8_t len;    //< payload length
-    uint8_t payload[PKT_PAYLOAD_LEN];   //< data bytes (variable length)
-    uint8_t crc;    //< CRC over header and data
+    uint8_t flags;  //!< flags definition TBD
+    uint8_t addr;   //!< node address (0, 255 - reserved)
+    uint8_t cmd;    //!< packet command code
+    uint8_t len;    //!< payload length
+    uint8_t payload[PKT_PAYLOAD_LEN];   //!< data bytes (variable length)
+    uint8_t crc;    //!< CRC over header and data
 } packet_t;
 
 #define PKT_FLAG_REPLY 0x80 //< indicates reply packet
@@ -166,3 +172,4 @@ extern void pkt_parser(uint8_t nextbyte);
 
 #endif
 
+/** @} */

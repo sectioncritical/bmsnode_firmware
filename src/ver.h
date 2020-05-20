@@ -25,6 +25,11 @@
 #ifndef __VERSION_H__
 #define __VERSION_H__
 
+/** @addtogroup ver Version
+ *
+ * @{
+ */
+
 /**
  * Firmware version.
  *
@@ -33,3 +38,5 @@
 extern const uint8_t g_version[];
 
 #endif
+
+/** @} */
