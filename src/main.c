@@ -70,9 +70,6 @@
  *
  */
 
-// hold global pointer to node configuration
-config_t *nodecfg;
-
 void device_init(void)
 {
     // turn off peripherals we are not using
@@ -146,7 +143,8 @@ void main_loop(void)
     tmr_init();
 
     // load the node configuration
-    nodecfg = cfg_load();
+    // it will be loaded into the global configuration structure (see cfg.h)
+    cfg_load();
 
     // send out one byte on wake (this causes TXC to get set)
     UDR0 = 0x55;

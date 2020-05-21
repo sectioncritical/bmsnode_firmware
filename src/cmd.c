@@ -43,12 +43,7 @@
 //
 //////////
 
-// global node configuration
-// this is assumed to be set to non-NULL in main before anything
-// else runs
-extern config_t *nodecfg;
-
-#define NODEID (nodecfg->addr)
+#define NODEID (g_cfg_parms.addr)
 
 typedef union
 {
@@ -134,8 +129,12 @@ static bool cmd_addr(packet_t *pkt)
     if (uid == pktuid.u32)
     {
         // if the same, then update our address and store it
-        nodecfg->addr = pkt->addr;
-        cfg_store(nodecfg);
+        // fake a SETPARM payload for ADDR parm
+        uint8_t setparm[2];
+        setparm[0] = CFG_ADDR;
+        setparm[1] = pkt->addr;
+        cfg_set(2, setparm); // update the global config
+        cfg_store(); // commit the change
         return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADDR, pkt->payload, 4);
     }
     // only send reply if the UID matches
@@ -169,6 +168,37 @@ static bool cmd_adcraw(void)
     pld[4] = p_results[2];
     pld[5] = p_results[2] >> 8;
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADCRAW, pld, 6);
+}
+
+// implement SETPARM command
+// this does not validate parameters
+static bool cmd_setparm(packet_t *pkt)
+{
+    uint8_t pld[1];
+    // pass the payload onto cfg_set
+    // cfg_set does a minimal validation
+    // TODO test for error return and do *something* if there is an error
+    cfg_set(pkt->len, pkt->payload);
+    pld[0] = pkt->payload[0]; // get the parm ID for the reply
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_SETPARM, pld, 1);
+}
+
+// implement GETPARM command
+static bool cmd_getparm(packet_t *pkt)
+{
+    // max possible payload
+    uint8_t pld[12];
+    pld[0] = pkt->payload[0]; // copy out the requested parameter id
+
+    // get the parameter value into a payload buffer
+    // returns 0 if there is a problem
+    uint8_t len = cfg_get(sizeof(pld), pld);
+
+    // if 0 was returned due to parameter error, then re-set len to 1
+    // and the reply packet will have just the parameter and no value
+    // this will signal an error occurred
+    len = (len == 0) ? 1 : len;
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_GETPARM, pld, len);
 }
 
 static uint8_t last_cmd = 0;
@@ -249,6 +279,14 @@ bool cmd_process(void)
                 case CMD_SHUNTON:
                 case CMD_SHUNTOFF:
                     ret = cmd_ack(pkt);
+                    break;
+
+                case CMD_GETPARM:
+                    ret = cmd_getparm(pkt);
+                    break;
+
+                case CMD_SETPARM:
+                    ret = cmd_setparm(pkt);
                     break;
 
                 default:

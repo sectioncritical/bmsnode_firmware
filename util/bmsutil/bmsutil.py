@@ -345,6 +345,128 @@ def status(serport, addr, verbose=False):
     print("")
     serport.timeout = saved_timeout
 
+#             (id, bytes, name)
+parmtable = [ (1, 1, "ADDR"),
+              (2, 2, "VSCALE"),
+              (3, 2, "VOFFSET"),
+              (4, 2, "TSCALE"),
+              (5, 2, "TOFFSET"),
+              (6, 2, "XSCALE"),
+              (7, 2, "XOFFSET"),
+              (8, 2, "SHUNTON"),
+              (9, 2, "SHUNTOFF"),
+              (10, 2, "SHUNTTIME"),
+              (11, 1, "TEMPHI"),
+              (12, 1, "TEMPLO"),
+              (13, 2, "TEMPADJ")]
+
+def show_parmlist():
+    for parm in parmtable:
+        print(parm[2])
+
+def setparm(serport, addr, parmname, parmval, verbose=False):
+    # get the parameter first
+    parmlist = [parm for parm in parmtable if parm[2] == parmname]
+    if len(parmlist) != 1:
+        print("problem with parameter name: {}".format(parmname))
+        return
+    theparm = parmlist[0]
+    parmid = theparm[0]
+    parmsize = theparm[1]
+    print("setting parameter {} with ID {}, size {} bytes, to value {}".format(
+        parmname, parmid, parmsize, parmval))
+
+    # construct payload with parameter id and value
+    # TODO add validation of values here
+    payload = [parmid]
+    if parmsize == 1:
+        payload.extend([parmval])
+    elif parmsize == 2:
+        payload.extend([parmval & 0xFF, parmval >> 8])
+    else:
+        print("there is some unknown problem with parameter length")
+        return
+
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    pkt = NodePacket(address=addr, command=9, payload=payload)
+    pkt.serport = serport
+    pkt.verbose= verbose
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 9 and rpkt.reply:
+                print("")
+                print("command acknowledged, you should read back to verify")
+                print("")
+                break
+        else:
+            print("no reply")
+            break
+    serport.timeout = saved_timeout
+
+def getparms(serport, addr, verbose=False):
+    saved_timeout = serport.timeout
+    serport.timeout = 1
+
+    print("")
+    print("Parameters for node: {}".format(addr))
+    print("----------------------")
+
+    for parm in parmtable:
+        # generate a GETPARM packet for each parameter
+        pkt = NodePacket(address=addr, command=10, payload=[parm[0]])
+        pkt.serport = serport
+        pkt.verbose = verbose
+        pkt.send()
+
+        # process reply
+        while (True):
+            rpkt = NodePacket()
+            rpkt.verbose = verbose
+            rpkt.serport = serport
+            rpkt = rpkt.recv()
+            if rpkt:
+                if rpkt.address == addr and rpkt.command == 10 and rpkt.reply:
+                    parmid = rpkt.payload[0] # parameter ID from reply
+
+                    # check that parm ID in reply matches what we asked for
+                    if parmid != parm[0]:
+                        print("parameter ID mismatch: expected({}), found ({})".format(parm[0], parmid))
+                        break
+
+                    # make sure the reply payload length matches our expectation
+                    if (rpkt.length - 1) != parm[1]:
+                        print("parameter value length mismatch: expected ({}) found ({})".format(parm[1] + 1, rpkt.length))
+                        break
+
+                    # contruct payload value from one or two bytes
+                    if rpkt.length == 2:
+                        parmval = rpkt.payload[1]
+                    elif rpkt.length == 3:
+                        parmval = rpkt.payload[1] + (rpkt.payload[2] << 8)
+                    else:
+                        # somehow our length is still bad
+                        print("unexpected parameter packet length ({})".format(rpkt.length))
+                        break
+
+                    # print parm name and value
+                    print("{:10s}: {}".format(parm[2], parmval))
+
+                    break
+            else:
+                print("{}: no reply".format(parm[2]))
+                break
+
+    print("")
+    serport.timeout = saved_timeout
+
 def shunt(serport, addr, shunt_state, verbose=False):
     saved_timeout = serport.timeout
     serport.timeout = 1
@@ -439,6 +561,14 @@ def cli():
     pshunt.add_argument('-a', "--address", type=int, required=True, help="device address to set")
     pshunt.add_argument('-s', "--state", type=int, required=True, help="0 or 1 (off or on)")
 
+    pget = subp.add_parser("get", help="Get configuration values")
+    pget.add_argument('-a', "--address", type=int, required=True, help="device address to query")
+
+    pset = subp.add_parser("set", help="Set configuration value")
+    pset.add_argument('-a', "--address", type=int, help="device address to set parameter")
+    pset.add_argument('-p', "--parameter", type=str, required=True, help="name of parameter to set (? for list)")
+    pset.add_argument('-v', "--value", type=int, help="value of parameter")
+
     args = parser.parse_args()
 
     if args.cmdname == "discover":
@@ -468,6 +598,17 @@ def cli():
     elif args.cmdname == "shunt":
         flush_bus(ser)
         shunt(ser, args.address, shunt_state=args.state, verbose=args.verbose)
+
+    elif args.cmdname == "get":
+        flush_bus(ser)
+        getparms(ser, args.address, verbose=args.verbose)
+
+    elif args.cmdname == "set":
+        if args.parameter == "?":
+            show_parmlist()
+        else:
+            flush_bus(ser)
+            setparm(ser, args.address, args.parameter, args.value, verbose=args.verbose)
 
 """
     pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")

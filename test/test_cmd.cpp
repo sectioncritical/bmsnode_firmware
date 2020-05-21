@@ -50,7 +50,9 @@ FAKE_VALUE_FUNC(bool, pkt_send, uint8_t, uint8_t, uint8_t, uint8_t *, uint8_t);
 
 FAKE_VALUE_FUNC(uint32_t, cfg_uid);
 FAKE_VALUE_FUNC(uint8_t, cfg_board_type);
-FAKE_VOID_FUNC(cfg_store, config_t *);
+FAKE_VOID_FUNC(cfg_store);
+FAKE_VALUE_FUNC(bool, cfg_set,  uint8_t, uint8_t *);
+FAKE_VALUE_FUNC(uint8_t, cfg_get, uint8_t, uint8_t *);
 
 FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
@@ -60,7 +62,8 @@ FAKE_VALUE_FUNC(bool, shunt_is_on);
 FAKE_VALUE_FUNC(uint8_t, shunt_fault);
 FAKE_VOID_FUNC(swreset);
 
-config_t *nodecfg;
+// this normally exists in the cfg module. fake it here
+config_t g_cfg_parms;
 
 }
 
@@ -78,10 +81,9 @@ config_t *nodecfg;
 
 TEST_CASE("command processor")
 {
-    config_t testcfg = {0, 0, 0, 0};
+    g_cfg_parms = {0, 0, 0, 0};
     // initial tests assume device is already set with address 1
-    testcfg.addr = 1;
-    nodecfg = &testcfg;
+    g_cfg_parms.addr = 1;
 
     // flags, addr, cmd, len, payload
     packet_t pkt_ping = { 0, 1, CMD_PING, 0 };
@@ -215,8 +217,8 @@ static bool pkt_send_custom_fake(uint8_t flags, uint8_t nodeid, uint8_t cmd, uin
 
 TEST_CASE("UID command")
 {
-    config_t testcfg = { 0, 0, 0, 0 };
-    nodecfg = &testcfg;
+    // global config
+    g_cfg_parms = { 0, 0, 0, 0 };
 
     RESET_FAKE(pkt_ready);
     RESET_FAKE(pkt_send);
@@ -285,7 +287,7 @@ TEST_CASE("UID command")
     {
         // packet uses addr 1 and device has addr 1
         // should be allowed
-        testcfg.addr = 1; // device addr 1
+        g_cfg_parms.addr = 1; // device addr 1
 
         packet_t pkt = { 0, 1, CMD_UID, 0 }; // pkt addr 1
         pkt_ready_fake.return_val = &pkt;
@@ -357,7 +359,7 @@ TEST_CASE("UID command")
     {
         // packet uses addr 0 but device has assigned address 1
         // should not reply
-        testcfg.addr = 1; // assigned address 1
+        g_cfg_parms.addr = 1; // assigned address 1
 
         packet_t pkt = { 0, 0, CMD_UID, 0 }; // pkt address 0
         pkt_ready_fake.return_val = &pkt;
@@ -381,10 +383,49 @@ TEST_CASE("UID command")
     }
 }
 
+// need custom cfg_set() handler to copy the data from the emphemeral
+// buffer that was passed in
+static uint8_t cfg_set_buf_len = 0;
+static uint8_t cfg_set_buf[32];
+
+static bool cfg_set_custom_fake(uint8_t len, uint8_t *pbuf)
+{
+    // for now, no parameters are more than 2 bytes (plus id byte)
+    REQUIRE(len <= 3);
+
+    // preserve the arguments and buffer that was passed in
+    cfg_set_buf_len = len;
+    for (int i = 0; i < len; ++ i)
+    {
+        cfg_set_buf[i] = pbuf[i];
+    }
+
+    // need to actually set parameters here because other code depends on it
+    uint8_t id = pbuf[0];
+    uint8_t val8 = pbuf[1];
+    //uint16_t val16 = 0;
+    //if (len == 3)
+    //{
+    //    val16 = pbuf[1] + (pbuf[2] << 8);
+    //}
+
+    // handle parameter setting
+    switch (id)
+    {
+        case CFG_ADDR:
+            g_cfg_parms.addr = val8;
+            break;
+
+        default:
+            break;
+    }
+
+    return cfg_set_fake.return_val;
+}
+
 TEST_CASE("ADDR command")
 {
-    config_t testcfg = { 0, 0, 0, 0 };
-    nodecfg = &testcfg;
+    g_cfg_parms = { 0, 0, 0, 0 };
 
     RESET_FAKE(pkt_ready);
     RESET_FAKE(pkt_send);
@@ -393,10 +434,15 @@ TEST_CASE("ADDR command")
     RESET_FAKE(cfg_uid);
     RESET_FAKE(cfg_board_type);
     RESET_FAKE(cfg_store);
+    RESET_FAKE(cfg_set);
 
+    // set up cfg_set() fake handler
+    cfg_set_fake.custom_fake = cfg_set_custom_fake;
+    memset(cfg_set_buf, 0, sizeof(cfg_set_buf));
+    cfg_set_buf_len = 0;
+
+    // set up pkt_send() fake handler
     pkt_send_fake.custom_fake = pkt_send_custom_fake;
-
-    // reset the payload capture from pkt_send
     memset(pkt_send_payload, 0, 64);
     pkt_send_payload_len = 0;
 
@@ -410,7 +456,9 @@ TEST_CASE("ADDR command")
         pkt_send_fake.return_val = true;
 
         // this cmd is going to call cfg_uid()
+        // and cfg_set()
         cfg_uid_fake.return_val = 0xab563412;
+        cfg_set_fake.return_val = true;
 
         // send the command packet
         bool ret = cmd_process();
@@ -420,8 +468,13 @@ TEST_CASE("ADDR command")
         // should have called cfg_uid()
         CHECK(cfg_uid_fake.call_count == 1);
 
-        // should have set the node address to 1
-        CHECK(testcfg.addr == 1);
+        // should have called cfg_set()
+        CHECK(cfg_set_fake.call_count == 1);
+
+        // cfg_set() should be setting addr parameter to 1
+        CHECK(cfg_set_buf_len == 2);
+        CHECK(cfg_set_buf[0] == CFG_ADDR);  // config param
+        CHECK(cfg_set_buf[1] == 1);         // addr to set
 
         // check UID reply packet contents
         REQUIRE(pkt_send_fake.call_count == 1);
@@ -446,8 +499,7 @@ TEST_CASE("ADDR command")
 
 TEST_CASE("STATUS command")
 {
-    config_t testcfg = { 0, 0, 0, 0 };
-    nodecfg = &testcfg;
+    g_cfg_parms = { 0, 0, 0, 0 };
 
     RESET_FAKE(pkt_ready);
     RESET_FAKE(pkt_send);
@@ -462,7 +514,7 @@ TEST_CASE("STATUS command")
 
     pkt_send_fake.custom_fake = pkt_send_custom_fake;
 
-    testcfg.addr = 1; // device addr 1
+    g_cfg_parms.addr = 1; // device addr 1
 
     packet_t pkt = { 0, 1, CMD_STATUS, 0 };
     pkt_ready_fake.return_val = &pkt;
@@ -576,8 +628,7 @@ TEST_CASE("STATUS command")
 
 TEST_CASE("ADCRAW command")
 {
-    config_t testcfg = { 0, 0, 0, 0 };
-    nodecfg = &testcfg;
+    g_cfg_parms = { 0, 0, 0, 0 };
 
     RESET_FAKE(pkt_ready);
     RESET_FAKE(pkt_send);
@@ -591,7 +642,7 @@ TEST_CASE("ADCRAW command")
 
     pkt_send_fake.custom_fake = pkt_send_custom_fake;
 
-    testcfg.addr = 1; // device addr 1
+    g_cfg_parms.addr = 1; // device addr 1
 
     packet_t pkt = { 0, 1, CMD_ADCRAW, 0 };
     pkt_ready_fake.return_val = &pkt;
@@ -636,8 +687,7 @@ TEST_CASE("ADCRAW command")
 
 TEST_CASE("DFU command")
 {
-    config_t testcfg = { 0, 0, 0, 0 };
-    nodecfg = &testcfg;
+    g_cfg_parms = { 0, 0, 0, 0 };
 
     RESET_FAKE(pkt_ready);
     RESET_FAKE(pkt_send);
@@ -651,7 +701,7 @@ TEST_CASE("DFU command")
 
     pkt_send_fake.custom_fake = pkt_send_custom_fake;
 
-    testcfg.addr = 1; // device addr 1
+    g_cfg_parms.addr = 1; // device addr 1
 
     packet_t pkt = { 0, 1, CMD_DFU, 0 };
     pkt_ready_fake.return_val = &pkt;

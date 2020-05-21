@@ -297,3 +297,254 @@ With reply bit:
 ### Description
 
 Turns off the BMS Node cell shunting mode (balancing mode).
+
+SETPARM (9)
+-----------
+
+### Version Notes
+
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.7` |command introduced         |
+
+### Command
+
+|Byte   |Usage                              |
+|-------|-----------------------------------|
+|CMD    | 9                                 |
+|LEN    | 2+ (at least 2 bytes)             |
+|PLD[0] | parameter ID                      |
+|PLD[1] | first byte of parameter value     |
+|PLD[N] | additional bytes of parm value    |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage          |
+|-------|---------------|
+|CMD    | 9             |
+|LEN    | 1             |
+|PLD[0] | parameter ID  |
+
+### Description
+
+Sets the value of a configuration parameter. The parameter ID is specified as
+the first byte of the payload, and following bytes represent the parameter
+value. The meaning of the bytes depend on which parameter is selected.
+
+The following table summarizes the configuration parameters. See the following
+sections for details. Items marker TBD are placeholders and not yet
+implemented.
+
+|ID|Name     |Len|Description                                               |
+|--|---------|---|----------------------------------------------------------|
+| 1|ADDR     | 1 |node address (read-only)                                  |
+| 2|VSCALE   | 2 |cell voltage calibration scaler                           |
+| 3|VOFFSET  | 2 |cell voltage calibration offset                           |
+| 4|TSCALE   | 2 |(TBD) temp sensor calibration scaler                      |
+| 5|TOFFSET  | 2 |(TBD) temp sensor calibration offset                      |
+| 6|XSCALE   | 2 |(TBD) external sensor calibration scaler                  |
+| 7|XOFFSET  | 2 |(TBD) external sensor calibration offset                  |
+| 8|SHUNTON  | 2 |voltage above which shunting is on                        |
+| 9|SHUNTOFF | 2 |voltage below which shunting is off                       |
+|10|SHUNTTIME| 2 |inactivity timeout for shunt mode                         |
+|11|TEMPHI   | 1 |upper limit for temperature regulation                    |
+|12|TEMPLO   | 1 |lower limit for temperature regulation                    |
+|13|TEMPADJ  | 2 |(TBD)temperature regulation adjustment factor             |
+
+#### Parameter ADDR
+
+|Name     |Len|PLD[0]            |
+|---------|---|------------------|
+|ADDR     | 1 |8-bit node address| 
+
+##### Notes
+
+This parameter is read-only, and cannot be changed with the `SETPARM` command.
+Use the `ADDR` command instead.
+
+#### Parameter VSCALE
+
+|Name     |Len|PLD[0]   |PLD[1]   |
+|---------|---|---------|---------|
+|VSCALE   | 2 |low byte |high byte|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is a 16-bit unsigned calibration scaler applied when
+calculating the cell voltage.
+
+TODO add calculation description and calibration procedure.
+
+#### Parameter VOFFSET
+
+|Name     |Len|PLD[0]   |PLD[1]   |
+|---------|---|---------|---------|
+|VOFFSET  | 2 |low byte |high byte|
+
+##### Default Value
+
+0 mV
+
+##### Notes
+
+This parameter is a 16-bit signed calibration offset, in millivolts, applied
+when calculating the cell voltage.
+
+TODO add calculation description and calibration procedure.
+
+#### Parameter TSCALE
+
+**TBD**
+
+#### Parameter TOFFSET
+
+**TBD**
+
+#### Parameter XSCALE
+
+**TBD**
+
+#### Parameter XOFFSET
+
+**TBD**
+
+#### Parameter SHUNTON
+
+|Name     |Len|PLD[0]   |PLD[1]   |
+|---------|---|---------|---------|
+|SHUNTON  | 2 |low byte |high byte|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is 16-bit unsigned millivolts. When shunt mode is turned on,
+the shunt circuit will be activated when the cell voltage is greater than this
+value.
+
+This parameter works with the `SHUNTOFF` parameter to provide hysteresis in
+the shunt control loop. If the values are the same then there is no hysteresis.
+This value should always be the same as, or greater than `SHUNTOFF`.
+
+#### Parameter SHUNTOFF
+
+|Name     |Len|PLD[0]   |PLD[1]   |
+|---------|---|---------|---------|
+|SHUNTOFF | 2 |low byte |high byte|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is 16-bit unsigned millivolts. When shunt mode is turned on,
+the shunt circuit will be deactivated when the cell voltage is lower than this
+value.
+
+This parameter works with the `SHUNTON` parameter to provide hysteresis in
+the shunt control loop. If the values are the same then there is no hysteresis.
+This value should always be the same as, or less than `SHUNTON`.
+
+#### Parameter SHUNTTIME
+
+|Name     |Len|PLD[0]   |PLD[1]   |
+|---------|---|---------|---------|
+|SHUNTTIME| 2 |low byte |high byte|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is a shunt activity timeout in seconds. If there is no activity
+of any kind of this duration, then the fimrware will exit shunt mode.
+
+#### Parameter TEMPHI
+
+|Name     |Len|PLD[0]                        |
+|---------|---|------------------------------|
+|TEMPHI   | 1 |8-bit signed temperature limit|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is an 8-bit signed temperature value, in C. This parameter takes
+effect while in shunt mode. When the onboard temperature is above this value,
+the shunt circuit will be turned off, even if the cell voltage exceeds the
+turn-on voltage limit. When the onboard temperature is between this value and
+`TEMPLO` then the shunt circuit will be modulated using TBD algorithm. This
+value should always be greater than `TEMPLO`.
+
+#### Parameter TEMPLO
+
+|Name     |Len|PLD[0]                        |
+|---------|---|------------------------------|
+|TEMPLO   | 1 |8-bit signed temperature limit|
+
+##### Default Value
+
+TBD
+
+##### Notes
+
+This parameter is an 8-bit signed temperature value, in C. This parameter takes
+effect while in shunt mode. When the onboard temperature is below this value,
+the shunt circuit will be allowed to turn on according to the voltage limits.
+When the onboard temperature is between this value and `TEMPHI` then the shunt
+circuit will be modulated using TBD algorithm. This value should always be
+less than `TEMPHI`.
+
+#### Parameter TEMPADJ
+
+TBD
+
+GETPARM (10)
+-----------
+
+### Version Notes
+
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.7` |command introduced         |
+
+### Command
+
+|Byte   |Usage                              |
+|-------|-----------------------------------|
+|CMD    | 10                                |
+|LEN    | 1                                 |
+|PLD[0] | parameter ID                      |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage                              |
+|-------|-----------------------------------|
+|CMD    | 10                                |
+|LEN    | 2+ (at least 2 bytes)             |
+|PLD[0] | parameter ID                      |
+|PLD[1] | first byte of parameter value     |
+|PLD[N] | additional bytes of parm value    |
+
+### Description
+
+Gets the value of a configuration parameter. The parameter ID is specified as
+the first byte of the payload. In the reply, the first byte of the payload is
+the parameter ID, and the following payload bytes represent the parameter
+value. The meaning of the bytes depend on which parameter is selected.
+
+See the *SETPARM* command for detailed descriptions of the parameters.

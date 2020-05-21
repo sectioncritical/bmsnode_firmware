@@ -102,6 +102,8 @@ of the responding node.
 |  6 | STATUS  | read BMS node status              |
 |  7 | SHUNTON | turn on shunting                  |
 |  8 | SHUNTOFF| turn off shunting                 |
+|  9 | SETPARM | set configuration parameter       |
+| 10 | GETPARM | get configuration parameter       |
 
 See [Command Specification](command) for command details.
 

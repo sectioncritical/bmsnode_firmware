@@ -28,3 +28,38 @@ uint8_t _crc8_ccitt_update(uint8_t inCrc, uint8_t inData)
     return data;
 }
 
+#ifdef TEST_MAIN
+
+// this can be used to generate crc for a config with test values.
+// whenever the unit test is updated and test config values are changed,
+// you need to know what the correct crc is so it can be tested.
+// To use this:
+// - update the testcfg below to whatever values you need
+// - build this with gcc like this:
+//     gcc -DTEST_MAIN -I.. -o crc16 crc16.c
+// - run the test program ./crc16 to get the new CRC value
+
+#include <stdbool.h>
+#include <stdio.h>
+#include "../../src/cfg.h"
+
+static config_t testcfg =
+{
+    26, 2, 99,
+    1234, 5678, 4321, 7865, 5555, -9000,
+    32767, 32768, 65535, 120, -100, 10000
+};
+
+int main(void)
+{
+    uint8_t crc = 0;
+    uint8_t *pkt = (uint8_t *)&testcfg;
+    for (int i = 0; i < sizeof(config_t) - 1; ++i)
+    {
+        crc = _crc8_ccitt_update(crc, pkt[i]);
+    }
+    printf("0x%02X\n", crc);
+    return 0;
+}
+
+#endif

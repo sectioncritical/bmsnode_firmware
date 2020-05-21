@@ -44,7 +44,7 @@
 /**
  * BMS Node Packet Format
  */
-typedef struct
+typedef struct __attribute__ ((__packed__))
 {
     uint8_t flags;  //!< flags definition TBD
     uint8_t addr;   //!< node address (0, 255 - reserved)

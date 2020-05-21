@@ -86,82 +86,110 @@ static void eeprom_read_block_custom_fake(void *dst, const void *src, size_t cnt
 }
 
 // nominal config struct
-static config_t testcfg = { 4, 1, 99, 0x90 };
+// load test values so we can test for proper reading
+
+// len, type, addr,
+// vscale, voffset, tscale, toffset, xscale, xoffset, 
+// shunton, shuntoff, shunttime, temphi, templo, tempadj,
+// crc
+static config_t testcfg =
+{
+    26, 2, 99,
+    1234, 5678, 4321, 7865, 5555, -9000,
+    32767, 32768, 65535, 120, -100, 10000,
+    0x9A
+};
+
+// TODO update tests to check all the new field values
 
 TEST_CASE("Load cfg")
 {
     RESET_FAKE(eeprom_read_block);
     eeprom_read_block_fake.custom_fake = eeprom_read_block_custom_fake;
+    // this represents the data that is stored in eeprom
     eeprom_read_block_fake_data = (uint8_t *)&testcfg;
 
     SECTION("nominal")
     {
-        config_t *cfg = cfg_load();
+        bool ret = cfg_load();
+        CHECK(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
-        CHECK(eeprom_read_block_fake.arg0_val == cfg);
+        CHECK(eeprom_read_block_fake.arg0_val == &g_cfg_parms);
         CHECK(eeprom_read_block_fake.arg1_val == 0);
-        CHECK(eeprom_read_block_fake.arg2_val == 4);
-        CHECK(cfg->len == 4);
-        CHECK(cfg->type == 1);
-        CHECK(cfg->addr == 99);
-        CHECK(cfg->crc == 0x90);
+        CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
+        CHECK(g_cfg_parms.len == sizeof(config_t));
+        CHECK(g_cfg_parms.type == 2);
+        CHECK(g_cfg_parms.addr == 99);
+        CHECK(g_cfg_parms.crc == 0x9A);
     }
 
     SECTION("bad length")
     {
-        testcfg.len = 5;
+        testcfg.len += 1;
         update_crc(&testcfg);
-        config_t *cfg = cfg_load();
+        bool ret = cfg_load();
+        CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
-        CHECK(eeprom_read_block_fake.arg0_val == cfg);
+        CHECK(eeprom_read_block_fake.arg0_val == &g_cfg_parms);
         CHECK(eeprom_read_block_fake.arg1_val == 0);
-        CHECK(eeprom_read_block_fake.arg2_val == 4);
-        CHECK(cfg->addr == 0);
+        CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
+        CHECK(g_cfg_parms.addr == 0);
         // dont check internal field for defaults return
     }
 
     SECTION("bad type")
     {
-        testcfg.type = 2;
-        testcfg.len = 4; // restore correct value from prior test
+        testcfg.type = 1;
+        testcfg.len = sizeof(config_t); // restore correct value from prior test
         update_crc(&testcfg);
-        config_t *cfg = cfg_load();
+        bool ret = cfg_load();
+        CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
-        CHECK(eeprom_read_block_fake.arg0_val == cfg);
+        CHECK(eeprom_read_block_fake.arg0_val == &g_cfg_parms);
         CHECK(eeprom_read_block_fake.arg1_val == 0);
-        CHECK(eeprom_read_block_fake.arg2_val == 4);
-        CHECK(cfg->addr == 0);
+        CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
+        CHECK(g_cfg_parms.addr == 0);
         // dont check internal field for defaults return
     }
 
     SECTION("bad crc")
     {
-        testcfg.type = 1; // restore correct value
+        testcfg.type = 2; // restore correct value
         testcfg.crc++;
-        config_t *cfg = cfg_load();
+        bool ret = cfg_load();
+        CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
-        CHECK(eeprom_read_block_fake.arg0_val == cfg);
+        CHECK(eeprom_read_block_fake.arg0_val == &g_cfg_parms);
         CHECK(eeprom_read_block_fake.arg1_val == 0);
-        CHECK(eeprom_read_block_fake.arg2_val == 4);
-        CHECK(cfg->addr == 0);
+        CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
+        CHECK(g_cfg_parms.addr == 0);
         // dont check internal field for defaults return
     }
 }
 
 TEST_CASE("Store cfg")
 {
+    // test values. header and crc should be automatically updated
+    g_cfg_parms =
+    {
+        0, 0, 99,
+        1234, 5678, 4321, 7865, 5555, -9000,
+        32767, 32768, 65535, 120, -100, 10000,
+        0
+    };
+
     RESET_FAKE(eeprom_update_block);
-    testcfg.len = 0;
-    testcfg.type = 0;
-    testcfg.crc = 0;
-    testcfg.addr = 99;
-    cfg_store(&testcfg);
+//    g_cfg_parms.len = 0;
+//    g_cfg_parms.type = 0;
+//    g_cfg_parms.crc = 0;
+//    g_cfg_parms.addr = 99;
+    cfg_store();
     CHECK(eeprom_update_block_fake.call_count == 1);
     config_t *cfg = (config_t *)eeprom_update_block_fake.arg0_val;
-    CHECK(cfg->len == 4);
-    CHECK(cfg->type == 1);
+    CHECK(cfg->len == sizeof(config_t));
+    CHECK(cfg->type == 2);
     CHECK(cfg->addr == 99);
-    CHECK(cfg->crc == 0x90);
+    CHECK(cfg->crc == 0x9A);
     CHECK(eeprom_update_block_fake.arg1_val == 0);
-    CHECK(eeprom_update_block_fake.arg2_val == 4);
+    CHECK(eeprom_update_block_fake.arg2_val == sizeof(config_t));
 }

@@ -86,6 +86,20 @@
  */
 #define CMD_SHUNTOFF 8
 
+/**
+ * SETPARM command code
+ *
+ * Set a configuration parameter value.
+ */
+#define CMD_SETPARM 9
+
+/**
+ * GETPARM command code
+ *
+ * Get a configuration parameter value.
+ */
+#define CMD_GETPARM 10
+
 #ifdef __cplusplus
 extern "C" {
 #endif

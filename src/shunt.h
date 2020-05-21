@@ -34,13 +34,16 @@
 extern "C" {
 #endif
 
+/**
+ * shunt API return codes.
+ */
 typedef enum
 {
-    SHUNT_OK = 0,
-    SHUNT_OFF,
-    SHUNT_TIMEOUT,
-    SHUNT_UNDERVOLT,
-    SHUNT_OVERTEMP
+    SHUNT_OK = 0,       ///< function was successful
+    SHUNT_OFF,          ///< shunt is turned off
+    SHUNT_TIMEOUT,      ///< shunt stopped due to timeout
+    SHUNT_UNDERVOLT,    ///< under voltage occurred
+    SHUNT_OVERTEMP      ///< temperature limit exceeded
 } shunt_status_t;
 
 /**
@@ -85,11 +88,11 @@ extern shunt_status_t shunt_fault(void);
  * conditions, this process will autonomously stop shunting mode, in which
  * case it will return status indicating the reason for stopping.
  *
- * If the return code is anything other than SHUNT_OK, then shunt mode has
+ * If the return code is anything other than \ref SHUNT_OK, then shunt mode has
  * been turned off.
  *
- * @return SHUNT_OK if all monitors are okay, or status code to indicate the
- * reason for stopping.
+ * @return \ref SHUNT_OK if all monitors are okay, or status code to indicate
+ * the reason for stopping.
  */
 extern shunt_status_t shunt_run(void);
 

@@ -41,7 +41,7 @@ DEFINE_FFF_GLOBALS;
 // declare C-type functions
 extern "C" {
 
-FAKE_VALUE_FUNC(config_t *, cfg_load);
+FAKE_VALUE_FUNC(bool, cfg_load);
 FAKE_VALUE_FUNC(bool, cmd_process);
 FAKE_VALUE_FUNC(uint8_t, cmd_get_last);
 FAKE_VALUE_FUNC(bool, pkt_is_active);
