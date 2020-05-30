@@ -58,8 +58,7 @@ FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
 FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
-FAKE_VALUE_FUNC(bool, shunt_is_on);
-FAKE_VALUE_FUNC(uint8_t, shunt_fault);
+FAKE_VALUE_FUNC(uint8_t, shunt_status);
 FAKE_VOID_FUNC(swreset);
 
 // this normally exists in the cfg module. fake it here
@@ -412,7 +411,7 @@ static bool cfg_set_custom_fake(uint8_t len, uint8_t *pbuf)
     // handle parameter setting
     switch (id)
     {
-        case CFG_ADDR:
+        case 1: // CFG_ADDR
             g_cfg_parms.addr = val8;
             break;
 
@@ -473,7 +472,7 @@ TEST_CASE("ADDR command")
 
         // cfg_set() should be setting addr parameter to 1
         CHECK(cfg_set_buf_len == 2);
-        CHECK(cfg_set_buf[0] == CFG_ADDR);  // config param
+        CHECK(cfg_set_buf[0] == 1);  // CFG_ADDR config param
         CHECK(cfg_set_buf[1] == 1);         // addr to set
 
         // check UID reply packet contents
@@ -541,10 +540,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 5);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 5);
         CHECK(pkt_send_payload[0] == 0x80); // 0xD80 = 3456d
         CHECK(pkt_send_payload[1] == 0x0D);
         CHECK(pkt_send_payload[2] == 0x1F);
@@ -576,10 +575,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 5);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 5);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0x2C);
@@ -611,10 +610,10 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 5);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 5);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0xE7);

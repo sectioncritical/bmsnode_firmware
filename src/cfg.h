@@ -30,16 +30,9 @@
  * @{
  */
 
-/**
- * Configuration parameter IDs.
- *
- * @see config_t
- */
-typedef enum
-{
-    CFG_NONE = 0,
-    CFG_ADDR        ///< BMSNode bus address, 8-but unsigned
-} cfg_parm_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * Structure to hold the BMS Node configuration data.
@@ -66,10 +59,6 @@ typedef struct __attribute__ ((__packed__))
     uint16_t  tempadj;  ///< TBD temperature regulation algorithm factor
     uint8_t   crc;      ///< (private) structure CRC for non-volatile storage
 } config_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Global system configuration.

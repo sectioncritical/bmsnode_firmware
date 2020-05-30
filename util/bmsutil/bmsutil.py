@@ -3,6 +3,8 @@
 import serial
 import argparse
 import re
+import time
+from blessed import Terminal
 
 def crc8_ccitt(pktbytes):
     crc = 0
@@ -197,31 +199,35 @@ def flush_bus(serport):
     preambles = bytes([0x55] * 20)
     serport.write(preambles)
 
-def discover(serport, verbose=False):
+def ping(serport, addr, verbose=False):
     saved_timeout = serport.timeout
     serport.timeout = 0.02
+    pkt = NodePacket(address=addr, command=1)
+    pkt.verbose = verbose
+    pkt.serport = serport
+    pkt.send()
+
+    while (True):
+        rpkt = NodePacket()
+        rpkt.verbose = verbose
+        rpkt.serport = serport
+        rpkt = rpkt.recv()
+        if rpkt:
+            if rpkt.address == addr and rpkt.command == 1 and rpkt.reply:
+                return rpkt
+        else:
+            return None
+    serport.timeout = saved_timeout
+
+def discover(serport, verbose=False):
     print("Searching for devices")
     for addr in range(1, 17):
-        pkt = NodePacket(address=addr, command=1)
-        pkt.verbose = verbose
-        pkt.serport = serport
-        pkt.send()
-
-        while (True):
-            rpkt = NodePacket()
-            rpkt.verbose = verbose
-            rpkt.serport = serport
-            rpkt = rpkt.recv()
-            if rpkt:
-                if rpkt.address == addr and rpkt.command == 1 and rpkt.reply:
-                    # print("")
-                    print("{} ".format(addr), end="")
-                    break
-            else:
-                print(".", end="", flush=True)
-                break
+        resp = ping(serport, addr, verbose)
+        if resp:
+            print("{} ".format(addr), end="")
+        else:
+            print(".", end="", flush=True)
     print("")
-    serport.timeout = saved_timeout
 
 def dfu(serport, addr, verbose=False):
     saved_timeout = serport.timeout
@@ -241,9 +247,12 @@ def dfu(serport, addr, verbose=False):
             break
     serport.timeout = saved_timeout
 
-_board_types = ["unkown", "oshparkv4", "stuartv42"]
+_board_types = ["unknown", "oshparkv4", "stuartv42"]
 
-def uid(serport, addr, verbose=False):
+# return the uid, board type, and firmware version of a particular address
+# return is a tuple with formatted string
+# ("xx-xx-xx-xx", "oshpark", "1.2.3")
+def boardinfo(serport, addr, verbose=False):
     saved_timeout = serport.timeout
     serport.timeout = 1
 
@@ -259,23 +268,30 @@ def uid(serport, addr, verbose=False):
         rpkt = rpkt.recv()
         if rpkt:
             if rpkt.address == addr and rpkt.command == 3 and rpkt.reply:
+                # get the uid and format as string
                 uid = rpkt.payload[0:4]
                 uidstr = '-'.join(format(x, "02X") for x in uid)
-                print("")
+                # get the board type and convert to string
                 boardnum = rpkt.payload[4]
                 boardstr = _board_types[boardnum] if boardnum <= len(_board_types) else "invalid"
-                print("board type: {}".format(boardstr))
-                print("device address: {} / UID: {}".format(addr, uidstr))
+                # get the firmware version and format as string
                 verbytes = rpkt.payload[5:8]
-                print("firmware version: {}.{}.{}".format(verbytes[0], verbytes[1], verbytes[2]))
-                print("")
-                break
+                verstr = "{}.{}.{}".format(verbytes[0], verbytes[1], verbytes[2])
+                return uidstr, boardstr, verstr
         else:
-            print("no reply")
-            break
+            return None
+    serport.timeout = saved_timeout
+
+def uid(serport, addr, verbose=False):
+    brdinfo = boardinfo(serport, addr, verbose)
+    if brdinfo:
+        print("board type: {}".format(brdinfo[0]))
+        print("device address: {} / UID: {}".format(addr, brdinfo[1]))
+        print("firmware version: {}".format(brdinfo[2]))
+    else:
+        print("Board {} was not found".format(addr))
 
     print("")
-    serport.timeout = saved_timeout
 
 def adcraw(serport, addr, verbose=False):
     saved_timeout = serport.timeout
@@ -311,8 +327,11 @@ def adcraw(serport, addr, verbose=False):
     print("")
     serport.timeout = saved_timeout
 
-def status(serport, addr, verbose=False):
-    faultnames = [ "OK", "OFF", "TIMEOUT", "UNDERVOLT", "OVERTEMP" ]
+# return tuple of status
+# (999, 99, "OFF") # mv, C, str
+# first two are integers
+def getstatus(serport, addr, verbose=False):
+    statusnames = [ "OFF", "IDLE", "ON", "UNDERVOLT", "OVERTEMP" ]
     saved_timeout = serport.timeout
     serport.timeout = 1
 
@@ -330,20 +349,24 @@ def status(serport, addr, verbose=False):
             if rpkt.address == addr and rpkt.command == 6 and rpkt.reply:
                 mvolts = rpkt.payload[0] | (rpkt.payload[1] << 8)
                 tempc = rpkt.payload[2] | (rpkt.payload[3] << 8)
-                shunt_status = "ON" if rpkt.payload[4] == 1 else "off"
-                shunt_fault = rpkt.payload[5]
-                print("")
-                print("Cell voltage {:4} mV".format(mvolts))
-                print("Temperature  {:4} C".format(tempc))
-                print("Shunt         {:3} fault: {:s}".format(shunt_status, faultnames[shunt_fault]))
-                print("")
-                break
+                shunt_status = rpkt.payload[4]
+                shuntstr = statusnames[shunt_status]
+                return mvolts, tempc, shuntstr
         else:
-            print("no reply")
-            break
-
-    print("")
+            return None
     serport.timeout = saved_timeout
+
+def status(serport, addr, verbose=False):
+    brdstatus = getstatus(serport, addr, verbose)
+    if brdstatus:
+        print("")
+        print("Cell voltage {:4} mV".format(brdstatus[0]))
+        print("Temperature  {:4} C".format(brdstatus[1]))
+        print("Shunt        {:s}".format(brdstatus[2]))
+        print("")
+    else:
+        print("Board {} was not found".format(addr))
+    print("")
 
 #             (id, bytes, name)
 parmtable = [ (1, 1, "ADDR"),
@@ -529,11 +552,59 @@ def setaddr(serport, addr, uid, verbose=False):
             break
     serport.timeout = saved_timeout
 
-def cli():
-    # init the serial port
-    ser = serial.Serial("/dev/tty.SLAB_USBtoUART", baudrate=4800)
-    ser.timeout = 3
+layout ="""
+┌────┬─────────┬───────┬───────────┬─────────────┬────────────────┬─────────┐
+│ ID │ VOLTAGE │ TEMP  │   SHUNT   │     UID     │     TYPE       │ VERSION │
+├────┼─────────┼───────┼───────────┼─────────────┼────────────────┼─────────┤
+│999 │ 9999 mV │-999 C │ SSSSSSSSS │ XX-XX-XX-XX │ TTTTTTTTTTTTTT │99.99.99 │
+└────┴─────────┴───────┴───────────┴─────────────┴────────────────┴─────────┘
+"""
+heading = """┌────┬─────────┬───────┬───────────┬─────────────┬────────────────┬─────────┐
+│ ID │ VOLTAGE │ TEMP  │   SHUNT   │     UID     │     TYPE       │ VERSION │
+├────┼─────────┼───────┼───────────┼─────────────┼────────────────┼─────────┤"""
 
+footing = "└────┴─────────┴───────┴───────────┴─────────────┴────────────────┴─────────┘"
+infoline = "│{:3d} │ {:4d} mV │{:4d} C │ {:9s} │ {:11s} │ {:14s} │{:^8s} │"
+
+def monitor(serport):
+    nodelist = [] # (id(int), uid(str), type(str), ver(str))
+    print("Searching for devices")
+    flush_bus(serport)
+    for addr in range(1, 32):
+        resp = ping(serport, addr)
+        if resp:
+            brdinfo = boardinfo(serport, addr)
+            if brdinfo:
+                nodeinfo = (addr, brdinfo[0], brdinfo[1], brdinfo[2])
+                nodelist.append(nodeinfo)
+                print("found node {}".format(addr))
+
+    # nodelist now has all the nodes that were found
+    if len(nodelist) == 0:
+        print("no devices found")
+        return
+
+    term = Terminal()
+    print(term.clear)
+    print(heading)
+
+    userkey = None
+
+    with term.cbreak(), term.hidden_cursor():
+        while userkey not in ('q', 'Q'):
+            with term.location(0, 4):
+                for node in nodelist:
+                    flush_bus(serport)
+                    sts = getstatus(serport, node[0]) # get realtime status from node
+                    if sts:
+                        print(infoline.format(node[0], sts[0], sts[1], sts[2], node[1], node[2], node[3]))
+                    else:
+                        continue # if no response from this node, restart loop
+                print(footing)
+            time.sleep(0.5)
+            userkey = term.inkey(timeout=0)
+
+def cli():
     parser = argparse.ArgumentParser(description="BMS cell board utility")
     parser.add_argument('-v', "--verbose", action="store_true",
                         help="turn on some debug output")
@@ -569,7 +640,13 @@ def cli():
     pset.add_argument('-p', "--parameter", type=str, required=True, help="name of parameter to set (? for list)")
     pset.add_argument('-v', "--value", type=int, help="value of parameter")
 
+    pmon = subp.add_parser("monitor", help="Continuous status (q to exit)")
+
     args = parser.parse_args()
+
+    # init the serial port
+    ser = serial.Serial("/dev/tty.SLAB_USBtoUART", baudrate=4800)
+    ser.timeout = 3
 
     if args.cmdname == "discover":
         flush_bus(ser)
@@ -609,6 +686,9 @@ def cli():
         else:
             flush_bus(ser)
             setparm(ser, args.address, args.parameter, args.value, verbose=args.verbose)
+
+    elif args.cmdname == "monitor":
+        monitor(ser)
 
 """
     pmonitor = subp.add_parser("monitor", help="Continuous monitoring, q to quit")

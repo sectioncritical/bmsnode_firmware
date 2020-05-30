@@ -208,29 +208,25 @@ With reply bit:
 |Byte    |Usage                                     |
 |--------|------------------------------------------|
 |CMD     | 6                                        |
-|LEN     | 6                                        |
+|LEN     | 5                                        |
 |PLD[1:0]| Cell voltage millivolts, little-endian   |
 |PLD[3:2]| Temperature in C, signed, little-endian  |
-|PLD[4]  | Shunt status: 1-on, 0-off                |
-|PLD[5]  | Shunt fault - reason for last shunt exit |
+|PLD[4]  | Shunt status                             |
 
 ### Description
 
 The STATUS command is used to retrieve operating data from the BMS Node.
 This command is WIP and subject to change.
 
-The shunt fault field is a code that indicates why the shunt mode was stopped.
-This is **WIP** (work-in-progress) and subject to change in the future. After
-reading the value once, it will be reset to 0 in future readings until the
-shunt mode is used again.
+The shunt status field shows the current status of the shunt process.
 
-|Fault Code|Reason                                              |
-|----------|----------------------------------------------------|
-| 0        |OK - operating normally                             |
-| 1        |OFF - turned off                                    |
-| 2        |TIMEOUT - max duration expired                      |
-| 3        |UNDERVOLT - cell voltage dropped below threshold    |
-| 4        |OVERTEMP - maximum temperature exceeded             |
+|Shunt Status|Reason                                            |
+|------------|--------------------------------------------------|
+| 0          |OFF - turned off                                  |
+| 1          |IDLE - enabled but not shunting                   |
+| 2          |ON - shunt resistors turned on                    |
+| 3          |UNDERVOLT - cell voltage dropped below lower limit|
+| 4          |OVERTEMP - maximum temperature exceeded           |
 
 SHUNTON (7)
 -----------

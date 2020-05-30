@@ -34,7 +34,6 @@ devbuild:
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
-            - "doc/license-badge.svg"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
             - "$DOC_BUILD_DIR/firmware-docs.html"
@@ -55,7 +54,6 @@ build:
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
-            - "doc/license-badge.svg"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
             - "$DOC_BUILD_DIR/firmware-docs.html"

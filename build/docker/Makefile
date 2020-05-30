@@ -9,6 +9,7 @@ help:
 	@echo "login - login to gitlab registry (asks for gitlab password)"
 	@echo "build - build the bmsnode docker image"
 	@echo "push  - push the bmsnode docker image to gitlab"
+	@echo "run   - run container for local testing"
 	@echo ""
 
 .PHONY: build

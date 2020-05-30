@@ -39,60 +39,55 @@ extern "C" {
  */
 typedef enum
 {
-    SHUNT_OK = 0,       ///< function was successful
-    SHUNT_OFF,          ///< shunt is turned off
-    SHUNT_TIMEOUT,      ///< shunt stopped due to timeout
-    SHUNT_UNDERVOLT,    ///< under voltage occurred
+    SHUNT_OFF = 0,      ///< shunt process is turned off
+    SHUNT_IDLE,         ///< enabled but not currently shunting
+    SHUNT_ON,           ///< shunt resistors turned on
+    SHUNT_UNDERVOLT,    ///< below lower voltage limit
     SHUNT_OVERTEMP      ///< temperature limit exceeded
 } shunt_status_t;
 
 /**
  * Start cell shunting mode.
  *
- * The hardware will be configured and shunt resistors turned on to begin
- * draining current from the cell. shunt_run() **must** be called periodically
- * once shunting is turned on or else the board could overheat, or over-drain
- * the cell.
+ * The hardware will be configured and shunt process enabled. shunt_run()
+ * **must** be called periodically once shunting is turned on in order to run
+ * the monitoring process.
  */
 extern void shunt_start(void);
 
 /**
  * Stop cell shunting mode.
  *
- * The shunt resistors are turned off an everything is safed.
+ * The shunt resistors are turned off and everything is safed.
  */
 extern void shunt_stop(void);
 
 /**
- * Determine if shunt mode is current on.
+ * Get the shunt process status.
  *
- * @return `true` if shunt mode is on.
+ * Calling this function resets the shunt idle timeout. So as long as this is
+ * called repeatedly, shunt mode will not exit on its own.
+ *
+ * @return The current status of the shunt process. See \ref shunt_status_t
  */
-extern bool shunt_is_on(void);
-
-/**
- * Get the shunt fault status.
- *
- * This can be used to determine the reason for shunt mode to stop.
- *
- * @return the most recent shunt status.
- */
-extern shunt_status_t shunt_fault(void);
+extern shunt_status_t shunt_status(void);
 
 /**
  * Run shunt mode monitoring process.
  *
- * This function **must** be called periodically while shunting is turned on.
- * It will monitor various conditions such as cell voltage and temperature
- * to help prevent overheating or over draining the cells. Under certain such
- * conditions, this process will autonomously stop shunting mode, in which
- * case it will return status indicating the reason for stopping.
+ * **This function MUST be called periodically while shunting is turned on.**
+ * If this function is not called periodically, the cell boards could overheat
+ * and cause damage to the boards and possibly the cells.  It will monitor
+ * various conditions such as cell voltage and temperature to help prevent
+ * overheating or over draining the cells. The shunt resistors will be turned
+ * on or off as necessary to maintain the temperature and voltage limits. If
+ * there is no activity for a certain amount of time (see \ref
+ * config_t.shunttime) then the shunt mode will be turned off. While in shunt
+ * mode, the BMSNode board does not use any power saving mode and thus will
+ * eventually drain the cell faster that when in non-shunting mode.
  *
- * If the return code is anything other than \ref SHUNT_OK, then shunt mode has
- * been turned off.
- *
- * @return \ref SHUNT_OK if all monitors are okay, or status code to indicate
- * the reason for stopping.
+ * @return the current status of the shunt process. This is the same value
+ * returned from shunt_status().
  */
 extern shunt_status_t shunt_run(void);
 

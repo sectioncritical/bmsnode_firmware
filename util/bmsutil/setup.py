@@ -4,7 +4,7 @@ setup(
     name = 'bmsutil',
     version = '0.1',
     py_modules = ['bmsutil'],
-    install_requires = ['pyserial'],
+    install_requires = ['pyserial', 'blessed'],
     entry_points = '''
         [console_scripts]
         bmsutil=bmsutil:cli

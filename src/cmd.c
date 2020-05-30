@@ -131,7 +131,7 @@ static bool cmd_addr(packet_t *pkt)
         // if the same, then update our address and store it
         // fake a SETPARM payload for ADDR parm
         uint8_t setparm[2];
-        setparm[0] = CFG_ADDR;
+        setparm[0] = 1; // address parameter ID
         setparm[1] = pkt->addr;
         cfg_set(2, setparm); // update the global config
         cfg_store(); // commit the change
@@ -144,15 +144,14 @@ static bool cmd_addr(packet_t *pkt)
 // implement STATUS command
 static bool cmd_status(void)
 {
-    uint8_t pld[6];
+    uint8_t pld[5];
     uint16_t mvolts = adc_get_cellmv();
     pld[0] = mvolts;
     pld[1] = mvolts >> 8;
     int16_t tempC = adc_get_tempC();
     pld[2] = tempC;
     pld[3] = tempC >> 8;
-    pld[4] = shunt_is_on() ? 1 : 0;
-    pld[5] = shunt_fault();
+    pld[4] = shunt_status();
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, sizeof(pld));
 }
 

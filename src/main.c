@@ -281,9 +281,9 @@ void main_loop(void)
                 }
 
                 // run the shunt routine
-                // returns code if any monitor is tripped
-                shunt_status_t shunt_status = shunt_run();
-                if (SHUNT_OK != shunt_status)
+                // returns current shunt process status
+                shunt_status_t shunt_sts = shunt_run();
+                if (SHUNT_OFF == shunt_sts)
                 {
                     // shunt has been stopped for some reason
                     // exit back to idle state
