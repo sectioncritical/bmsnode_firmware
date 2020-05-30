@@ -4,6 +4,14 @@
 
 <!--- next entry here -->
 
+## 0.7.0
+2020-05-30
+
+### Features
+
+- **cfg:** add config set/get command, new set of parameters ... (f02b16586df129e5a2be71e425a7bea430e37e8d)
+- **shunt:** add shunt config, automation, status reporting #10 (b663812c11168afc410fb09ca5a767e5e84b7e4f)
+
 ## 0.6.1
 2020-05-20
 
