@@ -23,10 +23,12 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <avr/io.h>
 
 #include "thermistor_table.h"
+#include "cfg.h"
 #include "adc.h"
 
 // channel map - mux channels to sample
@@ -113,13 +115,9 @@ uint16_t *adc_get_raw(void)
 // return the cell voltage in millivolts
 uint16_t adc_get_cellmv(void)
 {
-    // cell voltage scaler value
-    // derived from Vref and voltage divider
-    // (Vref/1023) * ((475+402)/402) * 1024
-    // 1024 multiplier lets us use base16 integer math
-    // myConfig.cellVscale = 4472;
-    uint32_t mv1024 = (uint32_t)results[0] * (uint32_t)4472U;
+    uint32_t mv1024 = (uint32_t)results[0] * (uint32_t)g_cfg_parms.vscale;
     mv1024 /= 1024U;
+    mv1024 += g_cfg_parms.voffset;
     return (uint16_t)mv1024;
 }
 

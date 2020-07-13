@@ -131,7 +131,7 @@ bool cfg_load(void)
     // TODO: this can possibly be made more memory efficient, perhaps
     // storing init values in code mem and doing a copy
     g_cfg_parms.addr = 0;
-    g_cfg_parms.vscale = 4472;
+    g_cfg_parms.vscale = 4400;
     g_cfg_parms.voffset = 0;
     g_cfg_parms.tscale = 0;
     g_cfg_parms.toffset = 0;

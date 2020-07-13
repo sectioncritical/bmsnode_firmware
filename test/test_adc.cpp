@@ -31,6 +31,14 @@
 
 #include "catch.hpp"
 #include "adc.h"
+#include "cfg.h"
+
+// the following stuff is from C not C++
+extern "C" {
+
+config_t g_cfg_parms;
+
+}
 
 TEST_CASE("powerup")
 {
