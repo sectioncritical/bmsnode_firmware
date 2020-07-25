@@ -247,7 +247,7 @@ def dfu(serport, addr, verbose=False):
             break
     serport.timeout = saved_timeout
 
-_board_types = ["unknown", "oshparkv4", "stuartv42"]
+_board_types = ["unknown", "oshparkv4", "stuartv42", "bmsnode1"]
 
 # return the uid, board type, and firmware version of a particular address
 # return is a tuple with formatted string
@@ -285,8 +285,8 @@ def boardinfo(serport, addr, verbose=False):
 def uid(serport, addr, verbose=False):
     brdinfo = boardinfo(serport, addr, verbose)
     if brdinfo:
-        print("board type: {}".format(brdinfo[0]))
-        print("device address: {} / UID: {}".format(addr, brdinfo[1]))
+        print("board type: {}".format(brdinfo[1]))
+        print("device address: {} / UID: {}".format(addr, brdinfo[0]))
         print("firmware version: {}".format(brdinfo[2]))
     else:
         print("Board {} was not found".format(addr))
@@ -645,7 +645,7 @@ def cli():
     args = parser.parse_args()
 
     # init the serial port
-    ser = serial.Serial("/dev/tty.SLAB_USBtoUART", baudrate=4800)
+    ser = serial.Serial("/dev/tty.usbserial-A107LYRO", baudrate=4800)
     ser.timeout = 3
 
     if args.cmdname == "discover":

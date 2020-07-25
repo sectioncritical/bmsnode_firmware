@@ -42,7 +42,7 @@ PKG?=0.0.0
 # boards. This is used with "upload" targets.
 #
 AVRDUDE_PORT?=/dev/cu.usbmodem14101
-AVRDUDE_LOAD_PORT?=/dev/cu.SLAB_USBtoUART
+AVRDUDE_LOAD_PORT?=/dev/cu.usbserial-A107LYRO
 
 # settings for avrdude binary. You can override these to match your system.
 # avrdude should be installed somewhere on your system. The default setting
@@ -103,18 +103,20 @@ help:
 	@echo "-----------"
 	@echo "all/(default)    - build the firmware hex file"
 	@echo "clean            - delete all build products"
-	@echo "program          - program target using avrdude/programmer"
-	@echo "upload           - upload using serial boot loader w/avrdude"
+	@echo "program          - program dev build to target using avrdude/programmer"
+	@echo "upload           - upload dev build to target with serial boot loader (no dfu)"
+	@echo "dfuload          - upload with dfu command first"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"
-	@echo "dfu ADDR=1 PKG=1.0.0 - bootload new firmware onto node"
+	@echo "dfupkg ADDR=1 PKG=1.0.0 - bootload released firmware onto node w/dfu command"
 	@echo ""
 	@echo "Production and Provisioning"
 	@echo "---------------------------"
 	@echo "fuses            - program the fuses using programmer"
 	@echo "provision BOARD=oshparkv4 - provision the board info (one-time)"
 	@echo "program_boot     - program the boot loader using programmer"
+	@echo "program_boot_old - program old version of boot loader"
 	@echo "erase            - erase the device using programmer (not usual)"
 	@echo "boardinfo        - read board provisioning info"
 	@echo ""
@@ -185,11 +187,20 @@ program: $(HEXFILE)
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
 .PHONY: program_boot
-program_boot: optiboot/optiboot_bms_8_4800.hex
+program_boot: optiboot/optiboot_bms_8_4800_hd.hex
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+
+.PHONY: program_boot_old
+program_boot_old: optiboot/optiboot_bms_8_4800.hex
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
 .PHONY: upload
-upload: $(UPLOADFILE)
+upload: $(UPLOADFILE) venv
+	venv/bin/bmsloader -f $< upload
+	venv/bin/bmsloader -f $< verify
+
+.PHONY: upload_old
+upload_old: $(UPLOADFILE)
 	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
 
 .PHONY: fuses
@@ -207,10 +218,17 @@ test:
 $(PKGNAME)/$(PROGNAME).hex: $(PKGNAME).tar.gz
 	tar -xvf $<
 
-.PHONY: dfu
-dfu: $(PKGNAME)/$(PROGNAME).hex venv
+.PHONY: dfuload
+dfuload: $(UPLOADFILE) venv
 	venv/bin/bmsutil dfu -a $(ADDR)
-	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
+	venv/bin/bmsloader -f $< upload
+	venv/bin/bmsloader -f $< verify
+
+.PHONY: dfupkg
+dfupkg: $(PKGNAME)/$(PROGNAME).hex venv
+	venv/bin/bmsutil dfu -a $(ADDR)
+	venv/bin/bmsloader -f $< upload
+	venv/bin/bmsloader -f $< verify
 
 .PHONY: discover
 discover: venv

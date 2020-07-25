@@ -32,6 +32,7 @@
 
 #include "pkt.h"
 #include "ser.h"
+#include "cfg.h"
 
 // serial transmit buffer and pointers
 static uint8_t headp = 0;
@@ -46,8 +47,9 @@ static uint8_t txbuf[32];
 #define BUF_NOTFULL() (BUF_CNT() < 31)
 
 // easy enable/disable of TX ISR
-#define TXINT_ENABLE() (UCSR0B |= _BV(UDRIE0))
+#define TXINT_ENABLE() (UCSR0B |= (_BV(UDRIE0) | _BV(TXCIE0)))
 #define TXINT_DISABLE() (UCSR0B &= ~_BV(UDRIE0))
+// for DISABLE, TXC is disabled separately
 
 // the serial transmit buffer is used by app code that wants to send
 // a packet. but it is also used by the RX interrupt to copy any incoming
@@ -89,8 +91,8 @@ bool rxint_disable(void)
 // determine if serial hardware is active
 // criteria:
 // - tx sw buffer is not  empty
-// - tx interrupt is enabled (which means there is ongoing tx operation)
-// - txc complete flag is not set (tx byte in progress)
+// - tx UDRE interrupt is enabled (which means there is ongoing tx operation)
+// - tx TXC interrupt is enabled (tx byte in progress)
 // - rx is not empty (incoming bytes to process)
 //
 // This should be coupled with checking the packet processor as well
@@ -102,7 +104,7 @@ bool ser_is_active(void)
     {
         if (BUF_NOTEMPTY()
          || (UCSR0B & _BV(UDRIE0))
-         || !(UCSR0A & _BV(TXC0))
+         || (UCSR0B & _BV(TXCIE0))
          || (UCSR0A & _BV(RXC0)))
         {
             b_isactive = true;
@@ -114,6 +116,9 @@ bool ser_is_active(void)
 // write data to the serial output
 // TODO: consider all or nothing write, instead of partial when there
 // is not enough room in the buffer
+//
+// NOTE: this starts transmitting. so assume there is not any contention on
+// the serial bus (nothing being received)
 uint8_t ser_write(uint8_t *buf, uint8_t len)
 {
     uint8_t cnt = 0;
@@ -124,7 +129,13 @@ uint8_t ser_write(uint8_t *buf, uint8_t len)
             txbuf[headp++] = buf[cnt++];
             headp &= 0x1F;
         }
-        TXINT_ENABLE();
+        // for shared tx/rx boards, switch duplex
+        if (g_board_type >= BOARD_TYPE_BMSNODE)
+        {
+            UCSR0B &= ~_BV(RXEN0);  // disable RX function
+            UCSR0B |= _BV(TXEN0);   // enable TX function
+        }
+        TXINT_ENABLE(); // will kick off serial transmit
     }
     return cnt;
 }
@@ -135,6 +146,7 @@ void ser_flush(void)
     CRITICAL_RX()
     {
         TXINT_DISABLE();
+        UCSR0B &= ~_BV(TXCIE0);
         headp = 0;
         tailp = 0;
     }
@@ -150,16 +162,21 @@ ISR(USART0_RX_vect)
     // check for rx received
     if (flags & _BV(RXC0))
     {
-        // first, propogate the bytes down the bus, no matter what else
-        // is going on
+        // read character from uart
         uint8_t ch = UDR0;
 
-        // stuff byte into tx buffer
-        if (BUF_NOTFULL())
+        // only early hardware needs to do this
+        if (g_board_type < BOARD_TYPE_BMSNODE)
         {
-            txbuf[headp++] = ch;
-            headp &= 0x1F;
-            TXINT_ENABLE();
+            // propogate the byte down the bus, not matter what else
+            // is going on
+            if (BUF_NOTFULL())
+            {
+                // stuff byte into tx buffer
+                txbuf[headp++] = ch;
+                headp &= 0x1F;
+                TXINT_ENABLE();
+            }
         }
 
         // process bytes into packets
@@ -182,7 +199,7 @@ ISR(USART0_UDRE_vect)
         {
             // read byte from buffer and write to uart TX
             // clear TXC0 so that it can be used to detect tx complete
-            UCSR0A &= ~_BV(TXC0);
+            UCSR0A |= _BV(TXC0);
             UDR0 = txbuf[tailp++];
             tailp &= 0x1F;
         }
@@ -191,6 +208,39 @@ ISR(USART0_UDRE_vect)
     else
     {
         TXINT_DISABLE();
+    }
+
+    // TXC interrupt is still enabled so there is still one more interrupt
+    // once the last byte is completely shifted out
+}
+
+ISR(USART0_TX_vect)
+{
+    // on entry here, the last byte should have been shifted out and
+    // there is no more data to send.
+    // To be sure, double check the TX buffer and make sure there is not
+    // any other data to send before shutting down the UART TX
+    if (BUF_NOTEMPTY())
+    {
+        // re-enable the TX int and the handler will be invoked
+        TXINT_ENABLE();
+        // just return from here
+    }
+
+    // nothing else to send, as expected
+    else
+    {
+        // disable the TXC interrupt
+        // this indicates to serial module that TX no longer in use
+        UCSR0B &= ~_BV(TXCIE0);
+
+        // for shared tx/rx boards
+        if (g_board_type >= BOARD_TYPE_BMSNODE)
+        {
+            // disable UART TX, and enable UART RX
+            UCSR0B &= ~_BV(TXEN0);
+            UCSR0B |= _BV(RXEN0);
+        }
     }
 }
 

@@ -72,14 +72,15 @@
 
 void device_init(void)
 {
+    // global not populated yet, so get the board type
+    uint8_t boardtype = cfg_board_type();
+
     // turn off peripherals we are not using
     PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI) | _BV(PRTIM2) | _BV(PRTIM1);
 
     // turn off analog comparators
     ACSR0A = 0x80;
     ACSR1A = 0x80;
-
-    // not using watchdog, so disable it
 
     // set up IO
     // this sets up GPIOs. alt functions are set up with peripheral inits
@@ -90,7 +91,25 @@ void device_init(void)
     DDRB = _BV(DDB1);   // PB1 spare is set as output
 
     // set up UART0
-    UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0); // enable tx, rx, rx int
+    if (boardtype < BOARD_TYPE_BMSNODE)
+    {
+        // old diyBMS style board types
+        UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0); // enable tx, rx, rx int
+    }
+    else
+    {
+        // bmsnode style boards (shared tx/rx)
+        // enables RX, RX interrupt only. leave TX disabled until needed
+        UCSR0B = _BV(RXEN0) | _BV(RXCIE0);
+
+        // keep TX line as input when not actively transmitting
+        // enable pullup on the pin so that it keeps the shared TX/RX line
+        // pulled high when not being driven low
+        // This is overridden whenever TX is enabled in the ser module for
+        // sending data
+        PUEA = _BV(PORTA1);
+    }
+
     UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); // 8n1
     UCSR0D = _BV(SFDE0); // start frame detector
     UBRR0H = UBRRH_VALUE;
@@ -146,8 +165,11 @@ void main_loop(void)
     // it will be loaded into the global configuration structure (see cfg.h)
     cfg_load();
 
-    // send out one byte on wake (this causes TXC to get set)
-    UDR0 = 0x55;
+    if (g_board_type < BOARD_TYPE_BMSNODE)
+    {
+        // send out one byte on wake (this causes TXC to get set)
+        UDR0 = 0x55;
+    }
 
     pkt_reset(); // init packet parser
     ser_flush(); // init serial module
@@ -305,16 +327,25 @@ void main_loop(void)
 
                 // force LED outputs off
                 PORTA &= ~(_BV(PORTA5) | _BV(PORTA6) | _BV(PORTA3));
-                // disable the UART TX (for power saving)
-                UCSR0B &= ~_BV(TXEN0);
+
+                // this is only needed for old boards
+                if (g_board_type < BOARD_TYPE_BMSNODE)
+                {
+                    // disable the UART TX (for power saving)
+                    UCSR0B &= ~_BV(TXEN0);
+                }
 
                 // go to sleep
                 set_sleep_mode(SLEEP_MODE_PWR_DOWN);
                 sleep_mode();
 
                 // WAKING UP
-                // re-enable UART TX
-                UCSR0B |= _BV(TXEN0);
+                // this is only needed for old boards
+                if (g_board_type < BOARD_TYPE_BMSNODE)
+                {
+                    // re-enable UART TX
+                    UCSR0B |= _BV(TXEN0);
+                }
                 // turn on blue LED and set a timeout
                 PORTA |= _BV(PORTA5);
 

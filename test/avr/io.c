@@ -15,6 +15,7 @@ volatile uint8_t PRR = 0;
 volatile uint8_t PHDE = 0;
 volatile uint8_t DDRA = 0;
 volatile uint8_t DDRB = 0;
+volatile uint8_t PUEA = 0;
 volatile uint8_t PORTA = 0;
 volatile uint8_t PORTB = 0;
 volatile uint8_t TCCR0A = 0;

@@ -64,9 +64,14 @@ this:
 
 (from path `ATTinyCore/avr/bootloaders/optiboot`)
 
-    make bms_8_4800
+    make bms_8_4800_hd
 
-This will produce the hex file `optiboot_bms_8_4800.hex`.
+This will produce the hex file `optiboot_bms_8_4800_hd.hex`.
 
 This file is committed here so unless the boot loader changes, there is
 nothing else to do here.
+
+**NOTE:** the prior version of the BMS boot loader was called bms_8_4800.
+(without the *hd*). The current (new) version supports the half duplex serial
+used by the latest BMSNode boards. The prior version (without hd), is for the
+original "Stuart" design.

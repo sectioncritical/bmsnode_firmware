@@ -42,6 +42,7 @@ DEFINE_FFF_GLOBALS;
 extern "C" {
 
 FAKE_VALUE_FUNC(bool, cfg_load);
+FAKE_VALUE_FUNC(uint8_t, cfg_board_type);
 FAKE_VALUE_FUNC(bool, cmd_process);
 FAKE_VALUE_FUNC(uint8_t, cmd_get_last);
 FAKE_VALUE_FUNC(bool, pkt_is_active);
@@ -65,4 +66,4 @@ FAKE_VALUE_FUNC(shunt_status_t, shunt_run);
 }
 
 bool test_exit = false;
-
+uint8_t g_board_type = BOARD_TYPE_NONE;

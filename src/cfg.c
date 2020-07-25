@@ -57,6 +57,9 @@ typedef struct __attribute__ ((__packed__))
 // global system configuration is kept here
 config_t g_cfg_parms;
 
+// global to hold board type
+uint8_t g_board_type;
+
 // compute crc of a configuration block
 // this assumes that the length field is correct
 static uint8_t cfg_compute_crc(config_t *cfg)
@@ -96,6 +99,10 @@ uint8_t cfg_board_type(void)
 // defaults and returns false
 bool cfg_load(void)
 {
+    // first, update the board type into the global variable, which
+    // is used elsewhere for conditional execution
+    g_board_type = cfg_board_type();
+
     // there are a small number of boards with v1 config block that
     // already have addresses programmed. We could put code here to
     // recognize those and upgrade the config block preserving the address.

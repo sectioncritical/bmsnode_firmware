@@ -17,6 +17,7 @@ extern volatile uint8_t UCSR0A;
 // UCSR0B
 extern volatile uint8_t UCSR0B;
 #define RXCIE0      (7)
+#define TXCIE0      (6)
 #define UDRIE0      (5)
 #define RXEN0       (4)
 #define TXEN0       (3)
@@ -70,6 +71,9 @@ extern volatile uint8_t DDRB;
 #define DDB2        (2)
 #define DDB1        (1)
 #define DDB0        (0)
+
+// PUEA
+extern volatile uint8_t PUEA;
 
 // gpio port registers
 extern volatile uint8_t PORTA;

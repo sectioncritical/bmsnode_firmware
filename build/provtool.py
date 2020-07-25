@@ -41,9 +41,10 @@ Board List
 ==========
 oshparkv4 - original oshpark prototypes
 stuartv42 - small lot of v4.2 from stuart
+bmsnode1  - new board design
 """
 
-boards = { "oshparkv4": 1, "stuartv42": 2 }
+boards = { "oshparkv4": 1, "stuartv42": 2 , "bmsnode1": 3 }
 
 
 parser = argparse.ArgumentParser(description="BMSNode Provisioning Tool",

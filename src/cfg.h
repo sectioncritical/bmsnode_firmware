@@ -72,6 +72,26 @@ typedef struct __attribute__ ((__packed__))
 extern config_t g_cfg_parms;
 
 /**
+ * Board type.
+ *
+ * This is used for conditional execution where the type of board hardware
+ * makes a difference in which code path to take. This is updated by
+ * cfg_load().
+ */
+extern uint8_t g_board_type;
+
+/**
+ * Board types.
+ */
+typedef enum
+{
+    BOARD_TYPE_NONE = 0,    ///< undefined b oard type
+    BOARD_TYPE_OSHPARKV4,   ///< original OSHPark prototypes of diyBMS
+    BOARD_TYPE_STUARTV42,   ///< lot of v4.2 boards from Stuart
+    BOARD_TYPE_BMSNODE,     ///< BMSNode 1.x (new design)
+} board_type_t;
+
+/**
  * Get the board unique ID.
  *
  * This value is set during board production.
