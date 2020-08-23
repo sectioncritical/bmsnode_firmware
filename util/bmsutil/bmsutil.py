@@ -247,7 +247,7 @@ def dfu(serport, addr, verbose=False):
             break
     serport.timeout = saved_timeout
 
-_board_types = ["unknown", "oshparkv4", "stuartv42", "bmsnode1"]
+_board_types = ["unknown", "oshparkv4", "stuartv42", "bmsnode1", "jlclot1"]
 
 # return the uid, board type, and firmware version of a particular address
 # return is a tuple with formatted string

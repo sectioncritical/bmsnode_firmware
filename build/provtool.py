@@ -39,12 +39,13 @@ also handles the avrdude steps.
 board_list = """
 Board List
 ==========
-oshparkv4 - original oshpark prototypes
-stuartv42 - small lot of v4.2 from stuart
-bmsnode1  - new board design
+oshparkv4   - original oshpark prototypes
+stuartv42   - small lot of v4.2 from stuart
+bmsnode1    - new board design
+jlclot1     - v1 board from JLCPCB first lot"
 """
 
-boards = { "oshparkv4": 1, "stuartv42": 2 , "bmsnode1": 3 }
+boards = { "oshparkv4": 1, "stuartv42": 2 , "bmsnode1": 3, "jlclot1": 4 }
 
 
 parser = argparse.ArgumentParser(description="BMSNode Provisioning Tool",
