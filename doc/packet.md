@@ -78,9 +78,14 @@ to eliminate one byte of header.
 
 ### Address
 
-This is the node address. Node addresses are assigned during provisioning by
-TBD method. At the moment, addresses 1-254 are valid node addresses while
-0 and 255 are reserved.
+This is the node address. Node addresses are assigned using the `ADDR` command.
+Only one un-addressed node can be on a serial bus at one time. So nodes should
+be added to the bus one at a time and get immediate address assignment using
+the `ADDR` command. Or, they can be assigned when the board is tested or
+provisioned by the board test or provisioning utility.
+
+At the moment, addresses 1-254 are valid node addresses while 0 and 255 are
+reserved.
 
 For packets from the controller to a node, the controller sets the address
 field to the destination node. Each node knows its own address and only

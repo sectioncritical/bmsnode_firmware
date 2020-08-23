@@ -55,10 +55,13 @@ At this point it is awaiting boot loader commands. If no boot loader commands
 are received within a timeout period (4 seconds at the time of this writing),
 the the firmware restarts.
 
-The boot loader is arduino compatible
-[Optiboot](https://gitlab.com/kroesche/bmsnode/-/blob/master/build/optiboot/README.md)
-and uses [avrdude](https://www.nongnu.org/avrdude/) as the programming
-utility.
+The boot loader is (mostly) Arduino compatible
+[Optiboot](https://gitlab.com/kroesche/bmsnode/-/blob/master/build/optiboot/README.md).
+However, it has been modified to work using serial half-duplex. This
+modification is needed for the boot loader to work with the BMS Node serial
+hardware. Because of this, the normal tool for boot loading,
+[avrdude](https://www.nongnu.org/avrdude/), is not compatible. A python tool
+called `bmsloader.py` is provided in the utilities directory.
 
 UID (3)
 -------

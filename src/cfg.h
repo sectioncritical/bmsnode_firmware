@@ -89,6 +89,7 @@ typedef enum
     BOARD_TYPE_OSHPARKV4,   ///< original OSHPark prototypes of diyBMS
     BOARD_TYPE_STUARTV42,   ///< lot of v4.2 boards from Stuart
     BOARD_TYPE_BMSNODE,     ///< BMSNode 1.x (new design)
+    BOARD_TYPE_BMSNODE_JLC, ///< BMSNode 1.x (from JLCPCB)
 } board_type_t;
 
 /**
