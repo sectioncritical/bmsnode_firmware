@@ -32,10 +32,10 @@ Here is the diff of my changes to create the BMS optiboot:
 
 ```
 diff --git a/avr/bootloaders/optiboot/Makefile.custom b/avr/bootloaders/optiboot/Makefile.custom
-index 871d843..6d586eb 100644
+index 871d843..7fcc7d2 100644
 --- a/avr/bootloaders/optiboot/Makefile.custom
 +++ b/avr/bootloaders/optiboot/Makefile.custom
-@@ -16,3 +16,17 @@ ifndef PRODUCTION
+@@ -16,3 +16,26 @@ ifndef PRODUCTION
  	mv $(PROGRAM)_$(CHIP).lst $(PROGRAM)_$(TARGET).lst
  endif
 
@@ -46,13 +46,102 @@ index 871d843..6d586eb 100644
 +# always start boot loader after POR to avoid need for hw reset
 +# the LED is A6 which is different from arduino default
 +
++.PRECIOUS: %.elf
++
 +bms_8_4800:
-+	$(MAKE) attiny841	 AVR_FREQ=8000000L BAUD_RATE=4800 LED=A6 TIMEOUT=4 NO_START_APP_ON_POR=1 OPTIBOOT_CUSTOMVER=60
++	$(MAKE) attiny841	 AVR_FREQ=8000000L BAUD_RATE=4800 LED=A6 TIMEOUT=4 NO_START_APP_ON_POR=1 CUSTOM_VERSION=60
 +	mv $(PROGRAM)_attiny841.hex $(PROGRAM)_bms_8_4800.hex
 +ifndef PRODUCTION
 +	mv $(PROGRAM)_attiny841.lst $(PROGRAM)_bms_8_4800.lst
 +endif
 +
++bms_8_4800_hd:
++	$(MAKE) attiny841	 AVR_FREQ=8000000L BAUD_RATE=4800 LED=A6 TIMEOUT=4 NO_START_APP_ON_POR=1 CUSTOM_VERSION=61 DEFS=-DHALF_DUPLEX
++	mv $(PROGRAM)_attiny841.hex $(PROGRAM)_bms_8_4800_hd.hex
++ifndef PRODUCTION
++	mv $(PROGRAM)_attiny841.lst $(PROGRAM)_bms_8_4800_hd.lst
++endif
++
+diff --git a/avr/bootloaders/optiboot/optiboot.c b/avr/bootloaders/optiboot/optiboot.c
+index 76935b4..67a732c 100644
+--- a/avr/bootloaders/optiboot/optiboot.c
++++ b/avr/bootloaders/optiboot/optiboot.c
+@@ -160,6 +160,12 @@
+ /* the start of upload correctly to communicate with the  */
+ /* bootloader. Shorter timeouts are not viable.           */
+ /*                                                        */
++/* HALF_DUPLEX                                            */
++/* Like RS485 except switching is done enabling/disabling */
++/* TX and RX pins when needed and does not use external   */
++/* switch or transceiver for switching. Not implemented   */
++/* for SOFT_UART.                                         */
++/*                                                        */
+ /**********************************************************/
+
+ /**********************************************************/
+@@ -196,6 +202,8 @@
+ /**********************************************************/
+ /* Edit History:                                          */
+ /*                                                        */
++/* July 2020 Joe Kroesche github.com/kroesche/ATTinyCore  */
++/*      added HALF_DUPLEX option                          */
+ /* Mar 2020 Spence Konde for ATTinyCore                   */
+ /*           github.com/SpenceKonde                       */
+ /* 58.0 Pull in RS485 support by Vladimir Dronnikov       */
+@@ -749,7 +757,11 @@ int main(void) {
+   #ifndef SINGLESPEED
+   UCSRA = _BV(U2X); //Double speed mode USART
+   #endif //singlespeed
++  #ifdef HALF_DUPLEX
++  UCSRB = _BV(RXEN);  // enable Rx
++  #else
+   UCSRB = _BV(RXEN) | _BV(TXEN);  // enable Rx & Tx
++  #endif
+   UCSRC = _BV(URSEL) | _BV(UCSZ1) | _BV(UCSZ0);  // config USART; 8N1
+   UBRRL = (uint8_t)BAUD_SETTING;
+   #else // mega8/etc
+@@ -765,7 +777,11 @@ int main(void) {
+       #ifndef SINGLESPEED
+   UART_SRA = _BV(U2X0); //Double speed mode USART0
+       #endif
++  #ifdef HALF_DUPLEX
++  UART_SRB = _BV(RXEN0);
++  #else
+   UART_SRB = _BV(RXEN0) | _BV(TXEN0);
++  #endif
+   UART_SRC = _BV(UCSZ00) | _BV(UCSZ01);
+   UART_SRL = (uint8_t)BAUD_SETTING;
+     #endif // LIN_UART
+@@ -1051,8 +1067,29 @@ void putch(char ch) {
+       RS485_PORT &= ~_BV(RS485);
+       #endif
+     #else //not RS485
++      #ifdef HALF_DUPLEX
++      // HALF_DUPLEX is like RS485 except with internal TX/RX enable
++      // instead of internal signal
++      //
++      // initial check for UDRE is not necessary here because HALF_DUPLEX
++      // requires entire byte transmitted before exiting. Therefore upon
++      // entry here we are guaranteed that TX can take a byte. This saves
++      // some boot loader code space
++      //while (!(UART_SRA & _BV(UDRE0)) { /* wait for tx ready */ }
++      // disable RX, enable TX
++      UART_SRB = _BV(TXEN0);
++      // clear transmit complete flag
++      UART_SRA |= _BV(TXC0);
++      // write character to output
++      UART_UDR = ch;
++      // wait for transmit complete
++      while (!(UART_SRA & _BV(TXC0))) { /* wait */ }
++      // disable TX, re-enable RX
++      UART_SRB = _BV(RXEN0);
++      #else // not HALF_DUPLEX
+       while (!(UART_SRA & _BV(UDRE0))) {  /* Spin */ }
+         UART_UDR = ch;
++      #endif
+     #endif
+   #else //is LIN UART
+     while (!(LINSIR & _BV(LTXOK)))   {  /* Spin */ }
 ```
 
 Building
