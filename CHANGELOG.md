@@ -4,6 +4,19 @@
 
 <!--- next entry here -->
 
+## 0.8.0
+2020-09-02
+
+### Features
+
+- **board:** add support for new board bmsnode v1.0.0 (e7bcb5206ca2604bc4f03009bcdec424aaa0cb00)
+- **board:** add support for JLC v1.0.0 boards #47 (cfa3f25e4701834b903ab26a07c0eb28c9a965db)
+
+### Fixes
+
+- minor doc fixes for board update [skip ci] (eff6563e879645cfdb4744d773ab87194aa51ef5)
+- update bootloader README for half-duplex diffs [skip ci] (dea194e26b3e052c9d260fa49ee774623aa7b07d)
+
 ## 0.7.0
 2020-05-30
 
