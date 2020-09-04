@@ -1,0 +1,3 @@
+[submodule "util/bmsutil"]
+	path = util/bmsutil
+	url = git@gitlab.com:kroesche/bmsnode_bmsutil.git
