@@ -186,6 +186,11 @@ clean:
 program: $(HEXFILE)
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
+# dump the flash contents into a file
+.PHONY: dumpflash
+dumpflash:
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:r:flash_dump.bin:r
+
 .PHONY: program_boot
 program_boot: optiboot/optiboot_bms_8_4800_hd.hex
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
