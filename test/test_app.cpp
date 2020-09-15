@@ -31,6 +31,7 @@
 
 #include "cfg.h"
 #include "shunt.h"
+#include "testmode.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by serial module.
@@ -63,6 +64,7 @@ FAKE_VOID_FUNC(adc_sample);
 FAKE_VOID_FUNC(shunt_start);
 FAKE_VOID_FUNC(shunt_stop);
 FAKE_VALUE_FUNC(shunt_status_t, shunt_run);
+FAKE_VALUE_FUNC(testmode_status_t, testmode_run);
 }
 
 bool test_exit = false;

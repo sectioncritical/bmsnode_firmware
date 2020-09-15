@@ -36,6 +36,7 @@
 #include "adc.h"
 #include "ver.h"
 #include "shunt.h"
+#include "testmode.h"
 
 //////////
 //
@@ -200,6 +201,32 @@ static bool cmd_getparm(packet_t *pkt)
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_GETPARM, pld, len);
 }
 
+// implement TESTMODE command
+// does not validate test function, called function will check
+static bool cmd_testmode(packet_t *pkt)
+{
+    // if the function is 0 (off), then turn it off directly
+    if (pkt->payload[0] == 0)
+    {
+        testmode_off();
+    }
+    // if non-zero function, then pass to testmode handler
+    else
+    {
+        // verify the enable key is present in the payload
+        if ((pkt->payload[1] == 0xCA) && (pkt->payload[2] == 0xFE))
+        {
+            testmode_on(pkt->payload[0]);
+        }
+
+    }
+    // TODO: right now this function will ack the controller no matter the
+    // contents of this packet payload. A future improvement will check a
+    // return code from testmode_on() to see if the test function was valid
+    // and not ack the controller if there is a problem.
+    return cmd_ack(pkt);
+}
+
 static uint8_t last_cmd = 0;
 
 // return the last command received
@@ -286,6 +313,10 @@ bool cmd_process(void)
 
                 case CMD_SETPARM:
                     ret = cmd_setparm(pkt);
+                    break;
+
+                case CMD_TESTMODE:
+                    ret = cmd_testmode(pkt);
                     break;
 
                 default:

@@ -100,6 +100,13 @@
  */
 #define CMD_GETPARM 10
 
+/**
+ * TESTMODE command code
+ *
+ * Set a test mode.
+ */
+#define CMD_TESTMODE 11
+
 #ifdef __cplusplus
 extern "C" {
 #endif

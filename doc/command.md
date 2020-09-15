@@ -547,3 +547,58 @@ the parameter ID, and the following payload bytes represent the parameter
 value. The meaning of the bytes depend on which parameter is selected.
 
 See the *SETPARM* command for detailed descriptions of the parameters.
+
+TESTMODE (11)
+------------
+
+### Version Notes
+
+|Version|Notes                      |
+|-------|---------------------------|
+| `0.9` |command introduced         |
+
+### Command
+
+|Byte   |Usage                              |
+|-------|-----------------------------------|
+|CMD    | 11                                |
+|LEN    | 3                                 |
+|PLD[0] | test function                     |
+|PLD[1] | test key 1                        |
+|PLD[2] | test key 2                        |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 11   |
+|LEN    | 0    |
+|PLD    | None |
+
+### Description
+
+Places the BMSNode into one of several test modes. The first byte of the
+payload is the test function code. The next two bytes are a fixed key value
+that must be passed in the command. The value of the key bytes is:
+`0xCA, 0xFE`.
+
+A single function code is used to turn off any active test mode and the key
+does not have to match. For all remaining test function codes, the key must
+match. If the test function is not turned off by command, it will be
+automatically turned off after 60 seconds.
+
+Only one test function can be active at a time. While a test function is
+active, the device does not sleep (does not go to low power). While a test
+function is active, other commands do not work. (TODO: Verify this)
+
+**Test Function Codes**
+
+|Code| Test Function            |
+|----|--------------------------|
+|  0 | turn off test function   |
+|  1 | turn on Vref             |
+|  2 | turn on external IO      |
+|  3 | turn on shunt resistor   |
+|  4 | blink LEDs               |

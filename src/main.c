@@ -42,6 +42,7 @@
 #include "tmr.h"
 #include "adc.h"
 #include "shunt.h"
+#include "testmode.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -122,7 +123,8 @@ typedef enum
     STATE_IDLE,
     STATE_DFU,
     STATE_SLEEP,
-    STATE_SHUNT
+    STATE_SHUNT,
+    STATE_TEST
 } appstate_t;
 
 void main_loop(void)
@@ -258,6 +260,13 @@ void main_loop(void)
                     wdt_enable(WDTO_1S);
                 }
 
+                // if testmode, switch to TEST state
+                else if (lastcmd == CMD_TESTMODE)
+                {
+                    state = STATE_TEST;
+                    wdt_enable(WDTO_1S);
+                }
+
                 // otherwise, monitor activity and wait for sleep timeout
                 else
                 {
@@ -315,6 +324,18 @@ void main_loop(void)
                     state = STATE_IDLE;
 
                     // turn off the watchdog since we are exiting shunt mode
+                    MCUSR = 0;
+                    wdt_disable();
+                }
+                break;
+
+            // TEST - running testmode until it stops
+            case STATE_TEST:
+                wdt_reset();
+                testmode_status_t test_sts = testmode_run();
+                if (test_sts == TESTMODE_OFF)
+                {
+                    state = STATE_IDLE;
                     MCUSR = 0;
                     wdt_disable();
                 }

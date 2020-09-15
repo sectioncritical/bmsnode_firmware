@@ -66,6 +66,7 @@ OBJS+=$(OUT)/adc.o
 OBJS+=$(OUT)/ver.o
 OBJS+=$(OUT)/thermistor_table.o
 OBJS+=$(OUT)/shunt.o
+OBJS+=$(OUT)/testmode.o
 
 # to run the versioning tool we need to switch around to different
 # directories. So it is handy to be able to refer to directopries and files
@@ -105,7 +106,7 @@ help:
 	@echo "clean            - delete all build products"
 	@echo "program          - program dev build to target using avrdude/programmer"
 	@echo "upload           - upload dev build to target with serial boot loader (no dfu)"
-	@echo "dfuload          - upload with dfu command first"
+	@echo "dfuload          - upload with dfu command first (ADDR)"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"

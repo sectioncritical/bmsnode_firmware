@@ -33,6 +33,7 @@
 #include "cfg.h"
 #include "ver.h"
 #include "util/crc16.h"
+#include "testmode.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by command  module.
@@ -60,6 +61,9 @@ FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
 FAKE_VALUE_FUNC(uint8_t, shunt_status);
 FAKE_VOID_FUNC(swreset);
+
+FAKE_VOID_FUNC(testmode_off);
+FAKE_VOID_FUNC(testmode_on, testmode_status_t);
 
 // this normally exists in the cfg module. fake it here
 config_t g_cfg_parms;
