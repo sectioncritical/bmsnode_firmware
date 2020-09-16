@@ -30,8 +30,9 @@ With reply bit:
 
 ### Description
 
-The PING command is used for aliveness and device discovery. It simply replies
-with the same command code to indicate presence.
+The PING command is used for aliveness and device discovery. It replies with
+the same command code to indicate presence on the bus. It also turns on the
+green LED for 1 second for visual identification.
 
 DFU (2)
 -------

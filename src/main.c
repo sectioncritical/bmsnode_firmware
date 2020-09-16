@@ -132,8 +132,10 @@ void main_loop(void)
     // declaring these as static so that they do not end up on the stack
     static uint16_t blink_timeout;
     static uint16_t sleep_timeout;
+    static uint16_t identify_timeout;
     static uint16_t blink_period;
     static uint16_t adc_timeout;
+    static bool identify = false;
 
     cli(); // should already be disabled, just to be sure
     MCUSR = 0; // this has to be done here in order to disable WDT
@@ -221,6 +223,17 @@ void main_loop(void)
             PORTA ^= _BV(PORTA5);
         }
 
+        // manage green LED if in identify mode
+        if (identify)
+        {
+            // turn off the green LED after a time
+            if (tmr_expired(identify_timeout))
+            {
+                PORTA &= ~_BV(PORTA6);  // green off
+                identify = false;
+            }
+        }
+
         // run adc conversions
         if (tmr_expired(adc_timeout))
         {
@@ -265,6 +278,14 @@ void main_loop(void)
                 {
                     state = STATE_TEST;
                     wdt_enable(WDTO_1S);
+                }
+
+                // if last command was PING, turn on green LED for a while
+                else if (lastcmd == CMD_PING)
+                {
+                    PORTA |= _BV(PORTA6);   // turn on green
+                    identify_timeout = tmr_set(1000);
+                    identify = true;
                 }
 
                 // otherwise, monitor activity and wait for sleep timeout
