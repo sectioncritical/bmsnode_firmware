@@ -1,0 +1,12 @@
+{
+    "board": "BMSNode 1.0.0 board",
+    "thermistor": "Murata NCP15WB473F03RC",
+    "Tstart": 0,
+    "Tstop": 80,
+    "Tstep": 8,
+    "Tnominal": 25,
+    "Rnominal": 47000,
+    "Rpulldown": 47000,
+    "beta": 4050,
+    "counts": 1023
+}
