@@ -4,6 +4,18 @@
 
 <!--- next entry here -->
 
+## 0.8.1
+2020-09-16
+
+### Fixes
+
+- use cal constants for cell V calc, update cal value #32 #44 #50 (92601191dac303aa6651154281c67befc17c60d6)
+- make bmsutil a submodule [skip ci] (0bc446185f1eef7274c4c8cea69182d6ed73a12e)
+- add dumpflash target to Makefile for debug [skip ci] (61b0ae45a693d68ccbb2aaf0c9e8823c94fbf7aa)
+- add testmode command to firmware ... (e7625ff7bc19fb77d43c023883b7f174b95fab7b)
+- update thermistor table to match current part #38 #43 ... (f7b851eb8cfab0656632c9a65a03f7318fbf9c14)
+- add visual ident to PING command #7 (59929b1f7b6f96cc5cc3b2769c13c88f6bbc87cf)
+
 ## 0.8.0
 2020-09-02
 
