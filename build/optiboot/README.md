@@ -164,3 +164,7 @@ nothing else to do here.
 (without the *hd*). The current (new) version supports the half duplex serial
 used by the latest BMSNode boards. The prior version (without hd), is for the
 original "Stuart" design.
+
+**NOTE:** UPDATE - there is now a 2400 baud option. Use target `bms_8_2400_hd`
+to generate the 2400 boot loader. The reason for 2400 is for boards that have
+a hardware serial rate problem.

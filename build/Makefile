@@ -28,6 +28,9 @@ PROGNAME=bmsnode
 # name of package for updating
 PKG?=0.0.0
 
+# default serial data rate
+BAUD?=4800
+
 # AVRDUDE ports
 # you will need to override these for your system. The easiest thing to do
 # is to set an environment variable and then you wont need to type on command
@@ -107,6 +110,7 @@ help:
 	@echo "program          - program dev build to target using avrdude/programmer"
 	@echo "upload           - upload dev build to target with serial boot loader (no dfu)"
 	@echo "dfuload          - upload with dfu command first (ADDR)"
+	@echo "discover         - probe bus for connected devices"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"
@@ -117,6 +121,7 @@ help:
 	@echo "fuses            - program the fuses using programmer"
 	@echo "provision BOARD=oshparkv4 - provision the board info (one-time)"
 	@echo "program_boot     - program the boot loader using programmer"
+	@echo "program_boot2400 - program 2400 baud version using programmer"
 	@echo "program_boot_old - program old version of boot loader"
 	@echo "erase            - erase the device using programmer (not usual)"
 	@echo "boardinfo        - read board provisioning info"
@@ -150,6 +155,9 @@ help:
 	@echo "  Also, CHANGELOG may be updated every time 'changelog' or 'package'"
 	@echo "  target is run, so be sure that CHANGELOG.md is clean before"
 	@echo "  generating it for a real release."
+	@echo ""
+	@echo "* Any targets that use serial connection can also have BAUD= defined"
+	@echo "  to set the serial data rate. The default is 4800."
 	@echo ""
 
 CC=avr-gcc
@@ -196,14 +204,18 @@ dumpflash:
 program_boot: optiboot/optiboot_bms_8_4800_hd.hex
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
+.PHONY: program_boot2400
+program_boot2400: optiboot/optiboot_bms_8_2400_hd.hex
+	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+
 .PHONY: program_boot_old
 program_boot_old: optiboot/optiboot_bms_8_4800.hex
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
 .PHONY: upload
 upload: $(UPLOADFILE) venv
-	venv/bin/bmsloader -f $< upload
-	venv/bin/bmsloader -f $< verify
+	venv/bin/bmsloader -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -b $(BAUD) -f $< verify
 
 .PHONY: upload_old
 upload_old: $(UPLOADFILE)
@@ -226,19 +238,19 @@ $(PKGNAME)/$(PROGNAME).hex: $(PKGNAME).tar.gz
 
 .PHONY: dfuload
 dfuload: $(UPLOADFILE) venv
-	venv/bin/bmsutil dfu -a $(ADDR)
-	venv/bin/bmsloader -f $< upload
-	venv/bin/bmsloader -f $< verify
+	venv/bin/bmsutil -b $(BAUD) dfu -a $(ADDR)
+	venv/bin/bmsloader -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -b $(BAUD) -f $< verify
 
 .PHONY: dfupkg
 dfupkg: $(PKGNAME)/$(PROGNAME).hex venv
-	venv/bin/bmsutil dfu -a $(ADDR)
-	venv/bin/bmsloader -f $< upload
-	venv/bin/bmsloader -f $< verify
+	venv/bin/bmsutil -b $(BAUD) dfu -a $(ADDR)
+	venv/bin/bmsloader -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -b $(BAUD) -f $< verify
 
 .PHONY: discover
 discover: venv
-	venv/bin/bmsutil discover
+	venv/bin/bmsutil -b $(BAUD) discover
 
 .PHONY: cleantest
 cleantest:

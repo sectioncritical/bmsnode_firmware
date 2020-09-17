@@ -31,7 +31,7 @@
 #include <avr/sleep.h>
 
 #define F_CPU 8000000L
-#define BAUD 4800
+#define BAUD 2400
 #include <util/setbaud.h>
 #include <util/atomic.h>
 
