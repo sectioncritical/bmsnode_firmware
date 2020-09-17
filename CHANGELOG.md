@@ -4,6 +4,13 @@
 
 <!--- next entry here -->
 
+## 0.9.0
+2020-09-17
+
+### Features
+
+- change serial rate to 2400, update tools and docs (05e7fe85ff92970f6a9ae47a97dd1c3b53f979d3)
+
 ## 0.8.1
 2020-09-16
 
