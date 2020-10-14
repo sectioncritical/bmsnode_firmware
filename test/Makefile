@@ -28,7 +28,7 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode
+TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode bmstest_led
 
 MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
@@ -39,6 +39,7 @@ TMR_OBJS=test_main.o test_tmr.o tmr.o io.o
 ADC_OBJS=test_main.o test_adc.o adc.o io.o thermistor_table.o
 SHUNT_OBJS=test_main.o test_shunt.o shunt.o io.o
 TESTMODE_OBJS=test_main.o test_testmode.o testmode.o io.o
+LED_OBJS=test_main.o test_led.o led.o io.o
 
 TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
@@ -49,6 +50,7 @@ TEST_TMR_OBJS=$(addprefix $(OBJDIR)/, $(TMR_OBJS))
 TEST_ADC_OBJS=$(addprefix $(OBJDIR)/, $(ADC_OBJS))
 TEST_SHUNT_OBJS=$(addprefix $(OBJDIR)/, $(SHUNT_OBJS))
 TEST_TESTMODE_OBJS=$(addprefix $(OBJDIR)/, $(TESTMODE_OBJS))
+TEST_LED_OBJS=$(addprefix $(OBJDIR)/, $(LED_OBJS))
 
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
@@ -90,6 +92,9 @@ $(BINDIR)/bmstest_shunt: $(TEST_SHUNT_OBJS) | $(BINDIR)
 # TESTMODE test dependencies
 $(BINDIR)/bmstest_testmode: $(TEST_TESTMODE_OBJS) | $(BINDIR)
 
+# LED test dependencies
+$(BINDIR)/bmstest_led: $(TEST_LED_OBJS) | $(BINDIR)
+
 # compile a .c file
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
 	$(CC) $(CFLAGS) $(INCS) -o $@  -c $<
@@ -124,8 +129,8 @@ $(REPORTDIR)/check.xml: | $(REPORTDIR)
 	cppcheck --std=c99 --platform=avr8 --enable=all --suppress=missingIncludeSystem -v ../src --xml-version=2 2> $@
 
 # generate cppcheck html report
-$(REPORTDIR)/check/index.html: $(REPORTDIR)/check.xml | $(REPORTDIR)/check
-	cppcheck-htmlreport --file=$< --report-dir=$(REPORTDIR)/check --source-dir=../src
+$(REPORTDIR)/check/index.html: $(REPORTDIR)/check.xml venv | $(REPORTDIR)/check
+	. venv/bin/activate; cppcheck-htmlreport --file=$< --report-dir=$(REPORTDIR)/check --source-dir=../src
 
 # generate cppcheck badge
 $(REPORTDIR)/check-badge.svg: $(REPORTDIR)/check.xml venv
@@ -155,7 +160,7 @@ PY3=$(shell command -v python3 || command -v python)
 
 venv/bin/activate: requirements.txt
 	test -d venv || $(PY3) -m venv venv
-	. venv/bin/activate; pip install -U pip; pip install -U wheel; pip install -Ur $<
+	. venv/bin/activate; pip install -U pip setuptools wheel; pip install -Ur $<
 	touch venv/bin/activate
 
 .PHONY: realclean

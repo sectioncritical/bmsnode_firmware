@@ -1,3 +1,4 @@
 gcovr
 junit2html
 anybadge
+pygments

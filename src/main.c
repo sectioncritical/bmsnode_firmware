@@ -43,6 +43,7 @@
 #include "adc.h"
 #include "shunt.h"
 #include "testmode.h"
+#include "led.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -130,12 +131,8 @@ typedef enum
 void main_loop(void)
 {
     // declaring these as static so that they do not end up on the stack
-    static uint16_t blink_timeout;
     static uint16_t sleep_timeout;
-    static uint16_t identify_timeout;
-    static uint16_t blink_period;
     static uint16_t adc_timeout;
-    static bool identify = false;
 
     cli(); // should already be disabled, just to be sure
     MCUSR = 0; // this has to be done here in order to disable WDT
@@ -182,57 +179,36 @@ void main_loop(void)
     sei();
 
     // turn on blue LED at the start
-    PORTA |= _BV(PORTA5);
+    led_on(LED_BLUE);
 
     adc_powerup();  // power up ADC circuitry
 
     // do an initial blink for 5 seconds
     // with 50 ms toggle
     // rapid toggle means bms node is starting up
-    blink_timeout = tmr_set(50);
     sleep_timeout = tmr_set(5000);
-
+    led_blink(LED_BLUE, 50, 50);
     while(!tmr_expired(sleep_timeout))
     {
-        if (tmr_expired(blink_timeout))
-        {
-            blink_timeout += 50;
-            PORTA ^= _BV(PORTA5);
-        }
+        led_run();  // run LED blinker
     }
 
     // leave the blue LED on
-    PORTA |= _BV(PORTA5);
+    led_on(LED_BLUE);
 
     // reset sleep timeout to 1 sec
     // and blink to 200 msec toggle
     // start in idle state
-    blink_period = 200;
-    blink_timeout = tmr_set(blink_period);
     sleep_timeout = tmr_set(1000);
+    led_blink(LED_BLUE, 200, 200);
     appstate_t state = STATE_IDLE;
     adc_timeout = tmr_set(1);   // perform first conversion right away
 
     // blinky loop
     while (1)
     {
-        // run blue LED blinker
-        if (tmr_expired(blink_timeout))
-        {
-            blink_timeout += blink_period;
-            PORTA ^= _BV(PORTA5);
-        }
-
-        // manage green LED if in identify mode
-        if (identify)
-        {
-            // turn off the green LED after a time
-            if (tmr_expired(identify_timeout))
-            {
-                PORTA &= ~_BV(PORTA6);  // green off
-                identify = false;
-            }
-        }
+        // run LED blinker
+        led_run();
 
         // run adc conversions
         if (tmr_expired(adc_timeout))
@@ -258,8 +234,7 @@ void main_loop(void)
                     // set a longer sleep timeout for dfu mode,
                     // and update the blink indicator rate
                     sleep_timeout = tmr_set(8000);
-                    blink_period = 1000;
-                    blink_timeout = tmr_set(blink_period);
+                    led_blink(LED_BLUE, 1000, 1000);
                     state = STATE_DFU;
                 }
 
@@ -283,9 +258,7 @@ void main_loop(void)
                 // if last command was PING, turn on green LED for a while
                 else if (lastcmd == CMD_PING)
                 {
-                    PORTA |= _BV(PORTA6);   // turn on green
-                    identify_timeout = tmr_set(1000);
-                    identify = true;
+                    led_oneshot(LED_GREEN, 1000);
                 }
 
                 // otherwise, monitor activity and wait for sleep timeout
@@ -315,9 +288,8 @@ void main_loop(void)
                 {
                     // once the timer expires, drop into idle mode in
                     // case some other activity happens
-                    blink_period = 200;
-                    blink_timeout = tmr_set(blink_period);
                     sleep_timeout = tmr_set(1000);
+                    led_blink(LED_BLUE, 200, 200);
                     state = STATE_IDLE;
                 }
                 break;
@@ -339,9 +311,8 @@ void main_loop(void)
                 {
                     // shunt has been stopped for some reason
                     // exit back to idle state
-                    blink_period = 200;
-                    blink_timeout = tmr_set(blink_period);
                     sleep_timeout = tmr_set(1000);
+                    led_blink(LED_BLUE, 200, 200);
                     state = STATE_IDLE;
 
                     // turn off the watchdog since we are exiting shunt mode
@@ -368,7 +339,10 @@ void main_loop(void)
                 adc_powerdown();    // shut down analog circuits
 
                 // force LED outputs off
-                PORTA &= ~(_BV(PORTA5) | _BV(PORTA6) | _BV(PORTA3));
+                led_off(LED_BLUE);
+                led_off(LED_GREEN);
+                // force off external load enable
+                PORTA &= ~_BV(PORTA3);
 
                 // this is only needed for old boards
                 if (g_board_type < BOARD_TYPE_BMSNODE)
@@ -388,17 +362,16 @@ void main_loop(void)
                     // re-enable UART TX
                     UCSR0B |= _BV(TXEN0);
                 }
-                // turn on blue LED and set a timeout
-                PORTA |= _BV(PORTA5);
+                // turn on blue LED to show we wake up
+                led_on(LED_BLUE);
 
                 // DELIBERATE FALL THROUGH
                 // returns us to idle state
 
             default:
                 adc_powerup();          // turn on the analog circuits
-                blink_period = 200;
-                blink_timeout = tmr_set(blink_period);
                 sleep_timeout = tmr_set(1000);
+                led_blink(LED_BLUE, 200, 200);
                 adc_timeout = tmr_set(4); // allow some settling time
                 state = STATE_IDLE;
                 break;

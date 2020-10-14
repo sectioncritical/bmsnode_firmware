@@ -70,6 +70,7 @@ OBJS+=$(OUT)/ver.o
 OBJS+=$(OUT)/thermistor_table.o
 OBJS+=$(OUT)/shunt.o
 OBJS+=$(OUT)/testmode.o
+OBJS+=$(OUT)/led.o
 
 # to run the versioning tool we need to switch around to different
 # directories. So it is handy to be able to refer to directopries and files
@@ -264,7 +265,7 @@ venv: venv/bin/activate
 
 venv/bin/activate: requirements.txt
 	test -d venv || $(PY3) -m venv venv
-	. venv/bin/activate; pip install -U pip; pip install -Ur $<
+	. venv/bin/activate; pip install -U pip setuptools wheel; pip install -Ur $<
 	touch venv/bin/activate
 
 .PHONY: cleanvenv

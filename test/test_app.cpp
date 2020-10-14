@@ -32,6 +32,7 @@
 #include "cfg.h"
 #include "shunt.h"
 #include "testmode.h"
+#include "led.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by serial module.
@@ -65,6 +66,11 @@ FAKE_VOID_FUNC(shunt_start);
 FAKE_VOID_FUNC(shunt_stop);
 FAKE_VALUE_FUNC(shunt_status_t, shunt_run);
 FAKE_VALUE_FUNC(testmode_status_t, testmode_run);
+FAKE_VOID_FUNC(led_run);
+FAKE_VOID_FUNC(led_on, enum led_index);
+FAKE_VOID_FUNC(led_off, enum led_index);
+FAKE_VOID_FUNC(led_blink, enum led_index, uint16_t, uint16_t);
+FAKE_VOID_FUNC(led_oneshot, enum led_index, uint16_t);
 }
 
 bool test_exit = false;
