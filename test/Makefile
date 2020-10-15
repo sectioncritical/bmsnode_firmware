@@ -28,7 +28,7 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode bmstest_led
+TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode bmstest_led bmstest_list
 
 MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
@@ -40,6 +40,7 @@ ADC_OBJS=test_main.o test_adc.o adc.o io.o thermistor_table.o
 SHUNT_OBJS=test_main.o test_shunt.o shunt.o io.o
 TESTMODE_OBJS=test_main.o test_testmode.o testmode.o io.o
 LED_OBJS=test_main.o test_led.o led.o io.o
+LIST_OBJS=test_main.o test_list.o list.o
 
 TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
@@ -51,6 +52,7 @@ TEST_ADC_OBJS=$(addprefix $(OBJDIR)/, $(ADC_OBJS))
 TEST_SHUNT_OBJS=$(addprefix $(OBJDIR)/, $(SHUNT_OBJS))
 TEST_TESTMODE_OBJS=$(addprefix $(OBJDIR)/, $(TESTMODE_OBJS))
 TEST_LED_OBJS=$(addprefix $(OBJDIR)/, $(LED_OBJS))
+TEST_LIST_OBJS=$(addprefix $(OBJDIR)/, $(LIST_OBJS))
 
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
@@ -94,6 +96,9 @@ $(BINDIR)/bmstest_testmode: $(TEST_TESTMODE_OBJS) | $(BINDIR)
 
 # LED test dependencies
 $(BINDIR)/bmstest_led: $(TEST_LED_OBJS) | $(BINDIR)
+
+# List test dependencies
+$(BINDIR)/bmstest_list: $(TEST_LIST_OBJS) | $(BINDIR)
 
 # compile a .c file
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
