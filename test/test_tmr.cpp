@@ -157,3 +157,131 @@ TEST_CASE("tmr expired")
         CHECK(bexp); // expected erroneous timeout
     }
 }
+
+TEST_CASE("schedule")
+{
+    struct tmr tmr1;
+    struct tmr tmr2;
+    struct tmr *ptmr;
+    *p_systick = 0;
+    tmr_init();
+
+    // tmr_schedule can not handle the same timer being added twice. It does
+    // not check for this to save code space. Therefore it is not tested
+    // here.
+
+    SECTION("process with no scheduled timers")
+    {
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+    }
+
+    SECTION("schedule non-periodic")
+    {
+        // 1 second, non-periodic
+        tmr_schedule(&tmr1, 1, 1000, false);
+
+        // not timed out yet
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        // timed out
+        *p_systick = 2000;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        // advance time a bunch, make sure no more timeouts
+        *p_systick += 10000;
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+    }
+
+    SECTION("schedule periodic")
+    {
+        // 500 ms, periodic (use different id)
+        tmr_schedule(&tmr1, 99, 500, true);
+
+        // not timed out yet
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        // timed out
+        *p_systick = 550;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 99);
+
+        *p_systick = 900;
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        // advance time, check for another timeout
+        *p_systick = 1050;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 99);
+    }
+
+    SECTION("periodic and non-periodic")
+    {
+        // set a 100 ms periodic and a 500 ms non-periodic
+        tmr_schedule(&tmr1, 1, 100, true);
+        tmr_schedule(&tmr2, 2, 500, false);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        *p_systick = 101;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        *p_systick = 201;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        *p_systick = 301;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        *p_systick = 401;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+
+        // at this point both timers should expire so two calls should
+        // result in both timers. The tmr module does not guarantee and order
+        // and a caller should not rely on order.  However to do the test
+        // the code below takes advantage of knowlegde of the order the
+        // timers are returned.
+        *p_systick = 501;
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr2);
+        CHECK(ptmr->id == 2);
+
+        ptmr = tmr_process();
+        CHECK(ptmr == &tmr1);
+        CHECK(ptmr->id == 1);
+
+        ptmr = tmr_process();
+        CHECK_FALSE(ptmr);
+    }
+}
