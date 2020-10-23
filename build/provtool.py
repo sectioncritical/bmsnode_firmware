@@ -43,9 +43,10 @@ oshparkv4   - original oshpark prototypes
 stuartv42   - small lot of v4.2 from stuart
 bmsnode1    - new board design
 jlclot1     - v1 board from JLCPCB first lot"
+bmsnode2    - v2 board design, JLC"
 """
 
-boards = { "oshparkv4": 1, "stuartv42": 2 , "bmsnode1": 3, "jlclot1": 4 }
+boards = { "oshparkv4": 1, "stuartv42": 2 , "bmsnode1": 3, "jlclot1": 4, "bmsnode2": 5 }
 
 
 parser = argparse.ArgumentParser(description="BMSNode Provisioning Tool",
