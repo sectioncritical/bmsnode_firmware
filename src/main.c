@@ -183,10 +183,10 @@ void main_loop(void)
 
     adc_powerup();  // power up ADC circuitry
 
-    // do an initial blink for 5 seconds
+    // do an initial blink for 1 seconds
     // with 50 ms toggle
     // rapid toggle means bms node is starting up
-    sleep_timeout = tmr_set(5000);
+    sleep_timeout = tmr_set(1000);
     led_blink(LED_BLUE, 50, 50);
     while(!tmr_expired(sleep_timeout))
     {
