@@ -73,12 +73,28 @@ static void update_crc(config_t *cfg)
     cfg->crc = crc;
 }
 
-static uint8_t *eeprom_read_block_fake_data;
+static uint8_t eeprom_data[512];
 
 static void eeprom_read_block_custom_fake(void *dst, const void *src, size_t cnt)
 {
+    // src is really address within eeprom
+    size_t eeaddr = (size_t)src;
+    CHECK((cnt + eeaddr) < sizeof(eeprom_data));
     uint8_t *pto = (uint8_t *)dst;
-    uint8_t *pfrom = eeprom_read_block_fake_data;
+    uint8_t *pfrom = &eeprom_data[eeaddr];
+    for (size_t i = 0; i < cnt; ++i)
+    {
+        pto[i] = pfrom[i];
+    }
+}
+
+static void eeprom_update_block_custom_fake(const void *src, void *dst, size_t cnt)
+{
+    // dst is really address within eeprom
+    size_t eeaddr = (size_t)dst;
+    CHECK((cnt + eeaddr) < sizeof(eeprom_data));
+    uint8_t *pto = &eeprom_data[eeaddr];
+    uint8_t *pfrom = (uint8_t *)src;
     for (size_t i = 0; i < cnt; ++i)
     {
         pto[i] = pfrom[i];
@@ -106,8 +122,9 @@ TEST_CASE("Load cfg")
 {
     RESET_FAKE(eeprom_read_block);
     eeprom_read_block_fake.custom_fake = eeprom_read_block_custom_fake;
-    // this represents the data that is stored in eeprom
-    eeprom_read_block_fake_data = (uint8_t *)&testcfg;
+    // put test data into eeprom for reading
+    memcpy(eeprom_data, &testcfg, sizeof(config_t));
+    config_t *eecfg = (config_t *)eeprom_data;  // map config over eeprom data
 
     SECTION("nominal")
     {
@@ -121,12 +138,13 @@ TEST_CASE("Load cfg")
         CHECK(g_cfg_parms.type == 2);
         CHECK(g_cfg_parms.addr == 99);
         CHECK(g_cfg_parms.crc == 0x9A);
+        CHECK(g_cfg_parms.vscale == 1234);
     }
 
     SECTION("bad length")
     {
-        testcfg.len += 1;
-        update_crc(&testcfg);
+        eecfg->len += 1;
+        update_crc(eecfg);
         bool ret = cfg_load();
         CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
@@ -134,14 +152,15 @@ TEST_CASE("Load cfg")
         CHECK(eeprom_read_block_fake.arg1_val == 0);
         CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
         CHECK(g_cfg_parms.addr == 0);
-        // dont check internal field for defaults return
+        // check one field for default value
+        CHECK(g_cfg_parms.vscale == 4400);
     }
 
     SECTION("bad type")
     {
-        testcfg.type = 1;
-        testcfg.len = sizeof(config_t); // restore correct value from prior test
-        update_crc(&testcfg);
+        eecfg->type = 1;
+        eecfg->len = sizeof(config_t); // restore correct value from prior test
+        update_crc(eecfg);
         bool ret = cfg_load();
         CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
@@ -149,13 +168,14 @@ TEST_CASE("Load cfg")
         CHECK(eeprom_read_block_fake.arg1_val == 0);
         CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
         CHECK(g_cfg_parms.addr == 0);
-        // dont check internal field for defaults return
+        // check one field for default value
+        CHECK(g_cfg_parms.vscale == 4400);
     }
 
     SECTION("bad crc")
     {
-        testcfg.type = 2; // restore correct value
-        testcfg.crc++;
+        eecfg->type = 2; // restore correct value
+        eecfg->crc++;
         bool ret = cfg_load();
         CHECK_FALSE(ret);
         CHECK(eeprom_read_block_fake.call_count == 1);
@@ -163,33 +183,135 @@ TEST_CASE("Load cfg")
         CHECK(eeprom_read_block_fake.arg1_val == 0);
         CHECK(eeprom_read_block_fake.arg2_val == sizeof(config_t));
         CHECK(g_cfg_parms.addr == 0);
-        // dont check internal field for defaults return
+        // check one field for default value
+        CHECK(g_cfg_parms.vscale == 4400);
     }
 }
 
 TEST_CASE("Store cfg")
 {
-    // test values. header and crc should be automatically updated
-    g_cfg_parms =
-    {
-        0, 0, 99,
-        1234, 5678, 4321, 7865, 5555, -9000,
-        32767, 32768, 65535, 120, -100, 10000,
-        0
-    };
+    // copy test config data into cfg global config, which will be stored
+    memcpy(&g_cfg_parms, &testcfg, sizeof(config_t));
 
     RESET_FAKE(eeprom_update_block);
-//    g_cfg_parms.len = 0;
-//    g_cfg_parms.type = 0;
-//    g_cfg_parms.crc = 0;
-//    g_cfg_parms.addr = 99;
+    eeprom_update_block_fake.custom_fake = eeprom_update_block_custom_fake;
+    // clear out the eeprom store
+    memset(eeprom_data, 0xFF, sizeof(config_t));
+    config_t *eecfg = (config_t *)eeprom_data;  // map config over eeprom data
+
+    // mess up stored crc to verify it was updated
+    g_cfg_parms.crc = 0;
+
     cfg_store();
     CHECK(eeprom_update_block_fake.call_count == 1);
-    config_t *cfg = (config_t *)eeprom_update_block_fake.arg0_val;
-    CHECK(cfg->len == sizeof(config_t));
-    CHECK(cfg->type == 2);
-    CHECK(cfg->addr == 99);
-    CHECK(cfg->crc == 0x9A);
+    CHECK(eeprom_update_block_fake.arg0_val == &g_cfg_parms);
     CHECK(eeprom_update_block_fake.arg1_val == 0);
     CHECK(eeprom_update_block_fake.arg2_val == sizeof(config_t));
+    CHECK(eecfg->len == sizeof(config_t));
+    CHECK(eecfg->type == 2);
+    CHECK(eecfg->addr == 99);
+    CHECK(eecfg->crc == 0x9A);
+}
+
+TEST_CASE("Set cfg items")
+{
+    RESET_FAKE(eeprom_update_block);
+    // clear the global config so we can verify items are set
+    memset(&g_cfg_parms, 0, sizeof(g_cfg_parms));
+
+    // normal "value" parameter looks like 3 byte array of
+    // [ id, lo byte, high byte ] with high byte only present for 16-bit parm
+    // the pointer to value passed in is the same format as a packet payload
+    // therefore, the length is the length of the packet payload which will
+    // be 2 for 8-bit parm and 3 for 16-bit parm
+
+    SECTION("set vscale nominal")
+    {   // 2-byte parameter
+        uint8_t pld[] = { 2, 0x34, 0x12 }; // vscale = 4660
+        bool ret = cfg_set(sizeof(pld), pld);
+        CHECK(ret);
+        CHECK(g_cfg_parms.vscale == 4660);
+        CHECK(eeprom_update_block_fake.call_count == 1);
+    }
+
+    SECTION("set temphi nominal")
+    {   // 1-byte parameter
+        uint8_t pld[] = { 11, 104 }; // temphi
+        bool ret = cfg_set(sizeof(pld), pld);
+        CHECK(ret);
+        CHECK(g_cfg_parms.temphi == 104);
+        CHECK(eeprom_update_block_fake.call_count == 1);
+    }
+
+    SECTION("bad cfg id 0")
+    {
+        uint8_t pld[] = { 0, 1, 2 };
+        bool ret = cfg_set(sizeof(pld), pld);
+        CHECK_FALSE(ret);
+        CHECK(eeprom_update_block_fake.call_count == 0);
+    }
+
+    SECTION("bad cfg id big")
+    {
+        uint8_t pld[] = { 100, 1, 2 };
+        bool ret = cfg_set(sizeof(pld), pld);
+        CHECK_FALSE(ret);
+        CHECK(eeprom_update_block_fake.call_count == 0);
+    }
+
+    SECTION("parm size mismatch")
+    {
+        uint8_t pld[] = { 2, 0x34 };
+        bool ret = cfg_set(sizeof(pld), pld);
+        CHECK_FALSE(ret);
+        CHECK(eeprom_update_block_fake.call_count == 0);
+    }
+}
+
+TEST_CASE("Get cfg items")
+{
+    // copy test config data into cfg global config
+    memcpy(&g_cfg_parms, &testcfg, sizeof(config_t));
+
+    uint8_t pld[8];
+
+    SECTION("get vscale nominal")
+    {   // 2-byte parameter
+        pld[0] = 2;     // vscale
+        uint8_t ret = cfg_get(sizeof(pld), pld);
+        CHECK(ret == 3);
+        CHECK(pld[0] == 2);     // verify vscale id
+        CHECK(pld[1] == (testcfg.vscale & 0xFF));
+        CHECK(pld[2] == (testcfg.vscale >> 8));
+    }
+
+    SECTION("get temphi nominal")
+    {   // 1-byte parameter
+        pld[0] = 11;
+        uint8_t ret = cfg_get(sizeof(pld), pld);
+        CHECK(ret == 2);
+        CHECK(pld[0] == 11);
+        CHECK(pld[1] == 120);
+    }
+
+    SECTION("bad cfg id 0")
+    {
+        pld[0] = 0;
+        uint8_t ret = cfg_get(sizeof(pld), pld);
+        CHECK_FALSE(ret);
+    }
+
+    SECTION("bad cfg id big")
+    {
+        pld[0] = 100;
+        uint8_t ret = cfg_get(sizeof(pld), pld);
+        CHECK_FALSE(ret);
+    }
+
+    SECTION("buffer too small")
+    {
+        pld[0] = 2;     // vscale
+        uint8_t ret = cfg_get(2, pld); // buffer too small
+        CHECK(ret == 0);
+    }
 }

@@ -214,6 +214,10 @@ bool cfg_set(uint8_t len, uint8_t *p_value)
             // copy second byte if there is one
             p_cfg[idx + 1] = p_value[2];
         }
+
+        // TODO: make this configurable
+        cfg_store();    // update the persistent config store
+
         return true;
     }
 }
