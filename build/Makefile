@@ -40,12 +40,13 @@ BAUD?=4800
 # it is used for any Makefile targets that "program" something. If you are
 # not using the programmer, then this does not matter.
 #
-# AVRDUDE_LOAD_PORT is a device serial port used for using avrdude with the
-# serial boot loader. It is the serial port that is connected to your bmsnode
-# boards. This is used with "upload" targets.
-#
 AVRDUDE_PORT?=/dev/cu.usbmodem14101
-AVRDUDE_LOAD_PORT?=/dev/cu.usbserial-A107LYRO
+
+# LOAD_PORT is a device serial port used for using avrdude or bmsloader with
+# the serial boot loader. It is the serial port that is connected to your
+# bmsnode boards. This is used with "upload" targets.
+#
+LOAD_PORT?=/dev/cu.usbserial-A107LYRO
 
 # settings for avrdude binary. You can override these to match your system.
 # avrdude should be installed somewhere on your system. The default setting
@@ -55,6 +56,10 @@ AVRDUDE_LOAD_PORT?=/dev/cu.usbserial-A107LYRO
 # need to. (the + means add to system configuration)
 AVRDUDE?=$(shell command -v avrdude)
 AVRDUDE_CONF?= +avrdude/t841.conf
+
+# bmsnode device address, for operations that need it
+# you almost certainly will need to override this on command line
+ADDR?=254
 
 OUT=obj
 SRC=../src
@@ -107,12 +112,12 @@ help:
 	@echo ""
 	@echo "Routine Use"
 	@echo "-----------"
-	@echo "all/(default)    - build the firmware hex file"
+	@echo "all/(default)    - build the firmware hex file (BAUD)"
 	@echo "clean            - delete all build products"
 	@echo "program          - program dev build to target using avrdude/programmer"
-	@echo "upload           - upload dev build to target with serial boot loader (no dfu)"
-	@echo "dfuload          - upload with dfu command first (ADDR)"
-	@echo "discover         - probe bus for connected devices"
+	@echo "upload           - upload dev build with serial boot loader (no dfu) (BAUD)"
+	@echo "dfuload          - upload with dfu command first (ADDR, BAUD)"
+	@echo "discover         - probe bus for connected devices (BAUD)"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"
@@ -122,8 +127,7 @@ help:
 	@echo "---------------------------"
 	@echo "fuses            - program the fuses using programmer"
 	@echo "provision BOARD=oshparkv4 - provision the board info (one-time)"
-	@echo "program_boot     - program the boot loader using programmer"
-	@echo "program_boot2400 - program 2400 baud version using programmer"
+	@echo "program_boot     - program the boot loader using programmer (BAUD)"
 	@echo "program_boot_old - program old version of boot loader"
 	@echo "erase            - erase the device using programmer (not usual)"
 	@echo "boardinfo        - read board provisioning info"
@@ -147,6 +151,13 @@ help:
 	@echo "venv             - create the python virtual environment"
 	@echo "cleanvenv        - clean the python virtual environment"
 	@echo ""
+	@echo "Defaults"
+	@echo "--------"
+	@echo "ADDR            = $(ADDR)"
+	@echo "BAUD            = $(BAUD)"
+	@echo "LOAD_PORT       = $(LOAD_PORT)"
+	@echo "AVRDUDE_PORT    = $(AVRDUDE_PORT)"
+	@echo ""
 	@echo "NOTES"
 	@echo "-----"
 	@echo "* 'make clean' then 'make package' will build everything"
@@ -157,9 +168,6 @@ help:
 	@echo "  Also, CHANGELOG may be updated every time 'changelog' or 'package'"
 	@echo "  target is run, so be sure that CHANGELOG.md is clean before"
 	@echo "  generating it for a real release."
-	@echo ""
-	@echo "* Any targets that use serial connection can also have BAUD= defined"
-	@echo "  to set the serial data rate. The default is 4800."
 	@echo ""
 
 CC=avr-gcc
@@ -174,7 +182,7 @@ $(OUT):
 
 $(OUT)/%.o: $(SRC)/%.c $(BUILD_DIR)/next-version | $(OUT)
 	$(eval VERSTR=$(shell cat $(BUILD_DIR)/next-version | tr '.' ','))
-	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -o $@  -c $<
+	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -DBAUD=$(BAUD) -o $@  -c $<
 
 $(ELFFILE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS)
@@ -203,11 +211,8 @@ dumpflash:
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:r:flash_dump.bin:r
 
 .PHONY: program_boot
-program_boot: optiboot/optiboot_bms_8_4800_hd.hex
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
-
-.PHONY: program_boot2400
-program_boot2400: optiboot/optiboot_bms_8_2400_hd.hex
+program_boot: optiboot/optiboot_bms_8_$(BAUD)_hd.hex
+	echo "Using $(BAUD) boot loader"
 	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
 
 .PHONY: program_boot_old
@@ -216,8 +221,8 @@ program_boot_old: optiboot/optiboot_bms_8_4800.hex
 
 .PHONY: upload
 upload: $(UPLOADFILE) venv
-	venv/bin/bmsloader -b $(BAUD) -f $< upload
-	venv/bin/bmsloader -b $(BAUD) -f $< verify
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< verify
 
 .PHONY: upload_old
 upload_old: $(UPLOADFILE)
@@ -240,19 +245,19 @@ $(PKGNAME)/$(PROGNAME).hex: $(PKGNAME).tar.gz
 
 .PHONY: dfuload
 dfuload: $(UPLOADFILE) venv
-	venv/bin/bmsutil -b $(BAUD) dfu -a $(ADDR)
-	venv/bin/bmsloader -b $(BAUD) -f $< upload
-	venv/bin/bmsloader -b $(BAUD) -f $< verify
+	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) dfu -a $(ADDR)
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< verify
 
 .PHONY: dfupkg
 dfupkg: $(PKGNAME)/$(PROGNAME).hex venv
-	venv/bin/bmsutil -b $(BAUD) dfu -a $(ADDR)
-	venv/bin/bmsloader -b $(BAUD) -f $< upload
-	venv/bin/bmsloader -b $(BAUD) -f $< verify
+	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) dfu -a $(ADDR)
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< upload
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< verify
 
 .PHONY: discover
 discover: venv
-	venv/bin/bmsutil -b $(BAUD) discover
+	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) discover
 
 .PHONY: cleantest
 cleantest:
