@@ -117,7 +117,9 @@ help:
 	@echo "program          - program dev build to target using avrdude/programmer"
 	@echo "upload           - upload dev build with serial boot loader (no dfu) (BAUD)"
 	@echo "dfuload          - upload with dfu command first (ADDR, BAUD)"
+	@echo "dfuping          - ping boot loader with dfu command first (ADDR, BAUD)"
 	@echo "discover         - probe bus for connected devices (BAUD)"
+	@echo "monitor          - run bus monitoring program (BAUD)"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"
@@ -255,9 +257,18 @@ dfupkg: $(PKGNAME)/$(PROGNAME).hex venv
 	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< upload
 	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< verify
 
+.PHONY: dfuping
+dfuping: $(UPLOADFILE) venv
+	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) dfu -a $(ADDR)
+	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) ping
+
 .PHONY: discover
 discover: venv
 	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) discover
+
+.PHONY: monitor
+monitor: venv
+	venv/bin/bmsutil -d $(LOAD_PORT) -b $(BAUD) monitor
 
 .PHONY: cleantest
 cleantest:
