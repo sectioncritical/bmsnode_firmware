@@ -735,7 +735,7 @@ FILE_VERSION_FILTER    =
 # DoxygenLayout.xml, doxygen will parse it automatically even if the LAYOUT_FILE
 # tag is left empty.
 
-LAYOUT_FILE            =
+LAYOUT_FILE            = layout.xml
 
 # The CITE_BIB_FILES tag can be used to specify one or more bib files containing
 # the reference definitions. This must be a list of .bib files. The .bib
@@ -824,11 +824,14 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = mainpage.md \
+INPUT                  = ../README.md \
                          license.md \
+                         ../requirements.md \
+                         ../design.md \
                          ../packet.md \
                          ../command.md \
                          ../blink-patterns.md \
+                         ../release-process.md \
                          ../../src
 
 # This tag can be used to specify the character encoding of the source files

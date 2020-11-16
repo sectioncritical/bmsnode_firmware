@@ -1,6 +1,9 @@
-These images are generated with a tool called
-[ditaa](http://ditaa.sourceforge.net).
+These images are generated with the following tools:
 
-Here is how to generate them:
+* .ditaa - [ditaa](http://ditaa.sourceforge.net).
+* .smcat - [smcat](https://github.com/sverweij/state-machine-cat)
 
-    ditaa system-diagram.ditaa -S -o
+See the Makefile in the doc build directory for targets to regenerate these
+images.
+
+The license badge may have come from shields.io, or generated with anybadge.

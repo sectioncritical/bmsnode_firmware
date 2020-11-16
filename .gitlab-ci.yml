@@ -29,15 +29,11 @@ devbuild:
     script:
         - "make -C $BUILD_DIR clean"
         - "make -C $BUILD_DIR package"
-        - "make -C $DOC_BUILD_DIR clean"
-        - "make -C $DOC_BUILD_DIR"
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
-            - "$DOC_BUILD_DIR/firmware-docs.html"
-            - "$DOC_BUILD_DIR/html/"
 
 build:
     stage: build
@@ -49,15 +45,11 @@ build:
     script:
         - "make -C $BUILD_DIR clean"
         - "make -C $BUILD_DIR package PRODUCTION=1"
-        - "make -C $DOC_BUILD_DIR clean"
-        - "make -C $DOC_BUILD_DIR"
     artifacts:
         paths:
             - "$BUILD_DIR/obj/bmsnode.*"
             - "$BUILD_DIR/bmsnode-*.tar.gz"
             - "$BUILD_DIR/buildlog.txt"
-            - "$DOC_BUILD_DIR/firmware-docs.html"
-            - "$DOC_BUILD_DIR/html/"
 
 test:
     stage: test
@@ -83,3 +75,17 @@ release:
     script:
         - "make -C $BUILD_DIR ci-status"
         - "make -C $BUILD_DIR release PRODUCTION=1"
+
+pages:
+    stage: build
+    script:
+        - "make -C $DOC_BUILD_DIR clean"
+        - "make -C $DOC_BUILD_DIR"
+        - "mkdir -p public"
+        - "cp -r doc/build/html/ public/html/"
+        - "cp -r doc/build/firmware-docs.html public/."
+    artifacts:
+        paths:
+            - public
+            - "$DOC_BUILD_DIR/firmware-docs.html"
+            - "$DOC_BUILD_DIR/html/"

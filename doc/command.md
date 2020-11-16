@@ -1,4 +1,4 @@
-BMSNode Command Specification {#command}
+BMSNode Command Specification
 =============================
 
 This document specifies the BMSNode commands and responses. For details about

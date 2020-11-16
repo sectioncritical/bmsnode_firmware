@@ -1,7 +1,5 @@
-BMS Node Packet Specification {#packet}
+BMS Node Packet Specification
 =============================
-
-_This is very preliminary and WIP._
 
 Features
 --------
@@ -12,22 +10,47 @@ Features
 * controller initiated transactions
 * 8-bit CRC
 
-Hardware Concerns
------------------
+Hardware Considerations
+-----------------------
 
-The current hardware uses a separate serial RX and TX signals. The nodes are
-intended to be chained together. Therefore, each node must repeat or propagate
-all data down the daisy chained serial bus.
+The serial hardware design uses a daisy-chained multi-drop bus. Each node is
+optically isolated and automatically propagates the serial data to the next
+node. The MCU serial RX and TX lines are shared which means that the MCU is
+listening most of the time, and only transmits in response to receiving a
+packet that it addressed to that node.
 
-The current data rate is constrained to 4800 due to slow response time of the
-optical isolators.
+The serial driver in the MCU must keep the TX signal as an input (or high-Z)
+except when it is transmitting. It must also make sure that the entire last
+byte has been transmitted before turning off the TX signal.
 
-The future hardware will combine the RX and TX signals to form a true
-multi-drop serial bus. This means that each node will no longer have to copy
-bytes. Instead each node just listens on the bus for any packets that require
-action.
+There is no hardware mechanism to prevent bus collisions. The design relies on
+the command/response format and that no node transmits unless commanded and
+only the controller (commanding host) issues commands. The controller software
+must ensure enough time between commands for responses to finish.
 
-The future hardware will also attempt to achieve higher data rates.
+The serial hardware design does incur a rise-time/fall-time error that
+accumulates with each node which limits the total number of nodes that can be
+chained together. That number is not characterized here.
+
+The present firmware is using 9600 for the data rate.
+
+Future Changes
+--------------
+
+The packet format presented below has been in use for a while. The flags field
+was included in the format in anticipation of the need for additional
+signaling. However during the firmware development there has not appeared a
+need for any additional flags.
+
+As a future optimization, the reply flag could be combined with the address or
+command fields, saving a byte.
+
+Another possible change, would be to change the preamble byte to another value
+that would make it easier to perform autobaud. The current preamble byte is
+a square wave which makes it possible to measure a single bit time using a
+timer. But that requires adding bit measuring timer code to the firmware. There
+are other autobaud techniques that use carefully chosen values that appear as
+different valid values depending on the baud rate.
 
 Packet Format
 -------------
@@ -85,7 +108,7 @@ the `ADDR` command. Or, they can be assigned when the board is tested or
 provisioned by the board test or provisioning utility.
 
 At the moment, addresses 1-254 are valid node addresses while 0 and 255 are
-reserved.
+reserved. Address 254 is being used for testing.
 
 For packets from the controller to a node, the controller sets the address
 field to the destination node. Each node knows its own address and only
@@ -126,6 +149,8 @@ The AVR toolchain runtime library provides an 8-bit CRC function called
 "crc8_ccitt" and that is used for BMS Node packet check field.
 
 https://www.nongnu.org/avr-libc/user-manual/group__util__crc.html#gab27eaaef6d7fd096bd7d57bf3f9ba083
+
+A Python implementation is provided at the end of this document.
 
 Parser State Machine
 --------------------
@@ -193,4 +218,29 @@ bytes.
 
 In operation, this should be handled as follows: if any node stops responding,
 the controller should send out at least 13 preamble bytes to reset the parser
-of all nodes on the bus.o
+of all nodes on the bus.
+
+CRC Python Implementation
+-------------------------
+
+Following is a python implementation of the same CRC function used by the
+packet processor. The `pktbytes` argument is bytes-like.
+
+```
+def crc8_ccitt(pktbytes):
+    crc = 0
+
+    for inbyte in pktbytes:
+
+        databyte = crc ^ inbyte
+
+        for idx in range(8):
+            if (databyte & 0x80) != 0:
+                databyte <<= 1
+                databyte ^= 0x07
+            else:
+                databyte <<= 1
+
+        crc = databyte & 0xFF
+    return crc
+```
