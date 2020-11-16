@@ -85,4 +85,6 @@ extern testmode_status_t testmode_run(void);
 }
 #endif
 
+/** @} */
+
 #endif

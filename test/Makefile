@@ -28,7 +28,7 @@ INCS=-I ./ -I../src
 
 VPATH=./ ../src avr/ util/
 
-TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode bmstest_led bmstest_list
+TESTS=bmstest_main bmstest_pkt bmstest_ser bmstest_cmd bmstest_cfg bmstest_tmr bmstest_adc bmstest_shunt bmstest_testmode bmstest_led bmstest_list bmstest_kissm
 
 MAIN_OBJS=test_main.o test_app.o main.o io.o
 PKT_OBJS=test_main.o test_pkt.o pkt.o crc16.o
@@ -41,6 +41,7 @@ SHUNT_OBJS=test_main.o test_shunt.o shunt.o io.o
 TESTMODE_OBJS=test_main.o test_testmode.o testmode.o io.o
 LED_OBJS=test_main.o test_led.o led.o io.o
 LIST_OBJS=test_main.o test_list.o list.o
+KISSM_OBJS=test_main.o test_kissm.o kissm.o
 
 TEST_MAIN_OBJS=$(addprefix $(OBJDIR)/, $(MAIN_OBJS))
 TEST_PKT_OBJS=$(addprefix $(OBJDIR)/, $(PKT_OBJS))
@@ -53,6 +54,7 @@ TEST_SHUNT_OBJS=$(addprefix $(OBJDIR)/, $(SHUNT_OBJS))
 TEST_TESTMODE_OBJS=$(addprefix $(OBJDIR)/, $(TESTMODE_OBJS))
 TEST_LED_OBJS=$(addprefix $(OBJDIR)/, $(LED_OBJS))
 TEST_LIST_OBJS=$(addprefix $(OBJDIR)/, $(LIST_OBJS))
+TEST_KISSM_OBJS=$(addprefix $(OBJDIR)/, $(KISSM_OBJS))
 
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
@@ -100,6 +102,9 @@ $(BINDIR)/bmstest_led: $(TEST_LED_OBJS) | $(BINDIR)
 # List test dependencies
 $(BINDIR)/bmstest_list: $(TEST_LIST_OBJS) | $(BINDIR)
 
+# Kissm test dependencies
+$(BINDIR)/bmstest_kissm: $(TEST_KISSM_OBJS) | $(BINDIR)
+
 # compile a .c file
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
 	$(CC) $(CFLAGS) $(INCS) -o $@  -c $<
@@ -131,7 +136,7 @@ $(REPORTDIR)/bmstest-coverage.html: $(REPORTS)
 
 # generate cppcheck xml report
 $(REPORTDIR)/check.xml: | $(REPORTDIR)
-	cppcheck --std=c99 --platform=avr8 --enable=all --suppress=missingIncludeSystem -v ../src --xml-version=2 2> $@
+	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem -v ../src --xml-version=2 2> $@
 
 # generate cppcheck html report
 $(REPORTDIR)/check/index.html: $(REPORTDIR)/check.xml venv | $(REPORTDIR)/check
@@ -145,14 +150,18 @@ $(REPORTDIR)/check-badge.svg: $(REPORTDIR)/check.xml venv
 # run cppcheck with plain output - useful for local running, and no reports
 .PHONY: check
 check:
-	cppcheck --std=c99 --platform=avr8 --enable=all --suppress=missingIncludeSystem -v ../src
+	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem -v ../src
 
 .PHONY: report
-report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg
+report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg checkunit
 
 .PHONY: runtest
 runtest: $(TESTBINS)
 	@for bin in $(TESTBINS); do echo "TEST: $$bin"; $$bin; done
+
+.PHONY: checkunit
+checkunit: $(REPORTDIR)/bmstest-junit.xml
+	@if $$(grep -q FAILED $<); then printf "\n*** There are unit test errors ***\n\n"; false; fi
 
 .PHONY: clean
 clean:

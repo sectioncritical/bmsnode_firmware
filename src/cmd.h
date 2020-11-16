@@ -25,6 +25,8 @@
 #ifndef __CMD_H__
 #define __CMD_H__
 
+#include "pkt.h"
+
 /** @addtogroup cmd Command
  *
  * @{
@@ -119,22 +121,10 @@ extern "C" {
  * for this node. If so then it dispatches the command for further processing
  * according to its function.
  *
- * @return returns `true` if a command was processed and `false` if not.
+ * @return returns a pointer to the last packet that was processed. The packet
+ * must be freed by the caller by using pkt_rx_free() as soon as possible.
  */
-extern bool cmd_process(void);
-
-/**
- * Get the last command that was processed.
- *
- * This function can be called to discover that last command procedded by
- * the command processor. This can be used by the main app loop to adjust
- * operating state based on commands to this node. The last command will be
- * cleared once this function is called.
- *
- * @return the command code of the last processed command, or 0 if there is
- * no recent command.
- */
-extern uint8_t cmd_get_last(void);
+extern packet_t *cmd_process(void);
 
 #ifdef __cplusplus
 }

@@ -95,14 +95,16 @@ TEST_CASE("command processor")
     RESET_FAKE(pkt_send);
     RESET_FAKE(pkt_rx_free);
 
+    packet_t *ppkt;
+
     SECTION("no packet ready")
     {
         pkt_ready_fake.return_val = NULL;
-        bool ret = cmd_process();
+        ppkt = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
         CHECK_FALSE(pkt_send_fake.call_count);
         CHECK_FALSE(pkt_rx_free_fake.call_count);
-        CHECK_FALSE(ret);
+        CHECK_FALSE(ppkt);
     }
 
     SECTION("packet with different node address")
@@ -110,9 +112,9 @@ TEST_CASE("command processor")
         packet_t *pkt = &pkt_ping;
         pkt->addr = 99; // valid but non-existing address
         pkt_ready_fake.return_val = pkt; // give packet to processor
-        bool ret = cmd_process();
+        ppkt = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
-        CHECK_FALSE(ret); // process should return false
+        CHECK_FALSE(ppkt); // process should return false
 
         CHECK_FALSE(pkt_send_fake.call_count); // pkt_send() not called
 
@@ -126,9 +128,10 @@ TEST_CASE("command processor")
         packet_t *pkt = &pkt_ping; // legit ping packet
         pkt_ready_fake.return_val = pkt; // give packet to processor
         pkt_send_fake.return_val = true; // indicate packet is sent
-        bool ret = cmd_process();
+        ppkt = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
-        CHECK(ret); // process should return true since packet was sent
+        CHECK(ppkt); // process should return true since packet was sent
+        CHECK(ppkt->cmd == CMD_PING);
 
         // verify pkt_send() was called correctly
         CHECK(pkt_send_fake.call_count == 1); // pkt_send was called
@@ -138,70 +141,49 @@ TEST_CASE("command processor")
         CHECK_FALSE(pkt_send_fake.arg3_val); // payload is null
         CHECK_FALSE(pkt_send_fake.arg4_val); // payload len
 
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == pkt);
+        // for valid packets returned pkt_rx_free() is not called
     }
 
     SECTION("last cmd ping to us")
     {
-        uint8_t lastcmd = cmd_get_last(); // flush old data
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
-
         packet_t *pkt = &pkt_ping;
         pkt_ready_fake.return_val = pkt;
         pkt_send_fake.return_val = true;
-        bool ret = cmd_process();
+        ppkt = cmd_process();
         REQUIRE(pkt_ready_fake.call_count == 1);
-        REQUIRE(ret);
+        REQUIRE(ppkt);
 
         // the above verifies the ping packet was processed
         // no need to check payload
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == CMD_PING);
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
+        CHECK(ppkt->cmd == CMD_PING);
+        pkt_ready_fake.return_val = NULL;
+        ppkt = cmd_process();
+        CHECK_FALSE(ppkt);
     }
 
     SECTION("last cmd ping to other node")
     {
-        uint8_t lastcmd = cmd_get_last(); // flush old data
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
-
         packet_t *pkt = &pkt_ping;
         pkt->addr = 99; // valid but non-existing address
         pkt_ready_fake.return_val = pkt;
         pkt_send_fake.return_val = true;
-        bool ret = cmd_process();
+        bool ppkt = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
-        CHECK_FALSE(ret); // not addressed to us
-
-        // last cmd should be 0
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
+        CHECK_FALSE(ppkt); // not addressed to us
     }
 
     SECTION("last cmd dfu to other node")
     {
-        uint8_t lastcmd = cmd_get_last(); // flush old data
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
-
         packet_t *pkt = &pkt_ping;
         pkt->cmd = CMD_DFU;
         pkt->addr = 99; // valid but non-existing address
         pkt_ready_fake.return_val = pkt;
         pkt_send_fake.return_val = true;
-        bool ret = cmd_process();
+        ppkt = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
-        CHECK_FALSE(ret); // not addressed to us
-
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == CMD_DFU);
-        lastcmd = cmd_get_last();
-        CHECK(lastcmd == 0);
+        // even DFU not addressed to us should return a packet
+        CHECK(ppkt);
+        CHECK(ppkt->cmd == CMD_DFU);
     }
 }
 
@@ -280,10 +262,6 @@ TEST_CASE("UID command")
         CHECK(pkt_send_payload[5] == 4);
         CHECK(pkt_send_payload[6] == 9);
         CHECK(pkt_send_payload[7] == 94);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 
     SECTION("with bus address 1 and assigned addr 1")
@@ -327,10 +305,6 @@ TEST_CASE("UID command")
         CHECK(pkt_send_payload[5] == 4);
         CHECK(pkt_send_payload[6] == 9);
         CHECK(pkt_send_payload[7] == 94);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 
     SECTION("with bus address 1 and unassigned addr")
@@ -493,10 +467,6 @@ TEST_CASE("ADDR command")
         CHECK(pkt_send_payload[1] == 0x34);
         CHECK(pkt_send_payload[2] == 0x56);
         CHECK(pkt_send_payload[3] == 0xab);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 }
 
@@ -552,10 +522,6 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_payload[1] == 0x0D);
         CHECK(pkt_send_payload[2] == 0x1F);
         CHECK(pkt_send_payload[3] == 0x0);  // 0x001F = 31d
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 
     SECTION("temperature > 8 bits")
@@ -587,10 +553,6 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0x2C);
         CHECK(pkt_send_payload[3] == 0x01);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 
     SECTION("negative temperature")
@@ -622,10 +584,6 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0xE7);
         CHECK(pkt_send_payload[3] == 0xFF);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 }
 
@@ -681,10 +639,6 @@ TEST_CASE("ADCRAW command")
         CHECK(pkt_send_payload[3] == 0x56);
         CHECK(pkt_send_payload[4] == 0xCD);
         CHECK(pkt_send_payload[5] == 0xAB);
-
-        // verify pkt_rx_free() was called
-        CHECK(pkt_rx_free_fake.call_count == 1);
-        CHECK(pkt_rx_free_fake.arg0_val == &pkt);
     }
 }
 

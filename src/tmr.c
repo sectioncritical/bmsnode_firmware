@@ -88,10 +88,11 @@ bool tmr_expired(uint16_t tmrset)
 // create a timer and add it to the processing list
 void tmr_schedule(struct tmr *p_tmr, uint8_t id, uint16_t duration, bool periodic)
 {
-    // TODO: this function does not properly handle the same timer being
-    // added twice. If this happens then the program may crash or hang.
-    // Checking would require additional code space and run time.
-    // For now leave it as-is and consider adding checking later.
+    // first, in case it is already scheduled, remove it from the list
+    // this is safe operation if not already in the list
+    tmr_unschedule(p_tmr);
+
+    // assemble new timer and add to the list
     p_tmr->id = id;
     p_tmr->periodic = periodic ? duration : 0;
     p_tmr->timeout = tmr_set(duration);

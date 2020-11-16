@@ -33,6 +33,9 @@
 #include "shunt.h"
 #include "testmode.h"
 #include "led.h"
+#include "tmr.h"
+#include "kissm.h"
+#include "pkt.h"
 
 // we are using fast-faking-framework for provding fake functions called
 // by serial module.
@@ -49,6 +52,7 @@ FAKE_VALUE_FUNC(bool, cmd_process);
 FAKE_VALUE_FUNC(uint8_t, cmd_get_last);
 FAKE_VALUE_FUNC(bool, pkt_is_active);
 FAKE_VOID_FUNC(pkt_reset);
+FAKE_VOID_FUNC(pkt_rx_free, packet_t *);
 FAKE_VOID_FUNC(ser_flush);
 FAKE_VALUE_FUNC(bool, ser_is_active);
 FAKE_VOID_FUNC(set_sleep_mode);
@@ -59,6 +63,8 @@ FAKE_VOID_FUNC(wdt_enable, uint16_t);
 FAKE_VOID_FUNC(tmr_init);
 FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
 FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
+FAKE_VOID_FUNC(tmr_schedule, struct tmr *, uint8_t, uint16_t, bool);
+FAKE_VALUE_FUNC(struct tmr *, tmr_process);
 FAKE_VOID_FUNC(adc_powerup);
 FAKE_VOID_FUNC(adc_powerdown);
 FAKE_VOID_FUNC(adc_sample);
@@ -71,6 +77,8 @@ FAKE_VOID_FUNC(led_on, enum led_index);
 FAKE_VOID_FUNC(led_off, enum led_index);
 FAKE_VOID_FUNC(led_blink, enum led_index, uint16_t, uint16_t);
 FAKE_VOID_FUNC(led_oneshot, enum led_index, uint16_t);
+FAKE_VOID_FUNC(kissm_init, struct kissm_state *);
+FAKE_VOID_FUNC(kissm_run, const struct kissm_event *);
 }
 
 bool test_exit = false;

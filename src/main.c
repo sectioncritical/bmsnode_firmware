@@ -46,6 +46,7 @@
 #include "shunt.h"
 #include "testmode.h"
 #include "led.h"
+#include "kissm.h"
 
 /*
  * Default clocking, per fuses, is 8 MHz internal oscillator with
@@ -120,263 +121,424 @@ void device_init(void)
     UBRR0L = UBRRL_VALUE;
 }
 
-// main loop states
-typedef enum
+// app event types
+enum app_event_types
 {
-    STATE_IDLE,
-    STATE_DFU,
-    STATE_SLEEP,
-    STATE_SHUNT,
-    STATE_TEST
-} appstate_t;
+    EVT_TMR = KISSM_EVT_APP,    // timer event occurred
+    EVT_TIMEOUT,                // state timeout
+    EVT_CMD                     // command event occurred
+};
 
+// declare states used in this application
+KISSM_DECLSTATE(powerup);
+KISSM_DECLSTATE(idle);
+KISSM_DECLSTATE(dfu);
+KISSM_DECLSTATE(shunt);
+KISSM_DECLSTATE(testmode);
+KISSM_DECLSTATE(sleep);
+
+// app level variables
+static struct tmr state_tmr;
+
+#define STATE_TMR 1
+
+// powerup state
+// does rapid blink, 1 second delay after system start
+KISSM_DEFSTATE(powerup)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            led_blink(LED_BLUE, 50, 50);    // LED rapid blink 50 ms
+            // state timeout 1 second
+            tmr_schedule(&state_tmr, STATE_TMR, 1000, false);
+            break;
+        }
+
+        case EVT_TIMEOUT:
+        {
+            // if the state timed out, switch to idle
+            p_ns = KISSM_STATEREF(idle);
+            break;
+        }
+
+        default:
+        {
+            break;
+        }
+    }
+    return p_ns;
+}
+
+// idle state
+// monitor activity and keep awake while stuff is happening
+KISSM_DEFSTATE(idle)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            // stay awake for at least 1 second
+            tmr_schedule(&state_tmr, STATE_TMR, 1000, false);
+            led_blink(LED_BLUE, 200, 200);  // normal activity blinker
+            break;
+        }
+
+        // no exit-specific action
+        case KISSM_EVT_EXIT:
+        {
+            break;
+        }
+
+        // handle commands
+        case EVT_CMD:
+        {
+            // for any command received, reset the timeout
+            tmr_schedule(&state_tmr, STATE_TMR, 1000, false);
+
+            // process the command
+            uint8_t cmd = ((packet_t *)p_event->data.p)->cmd;;
+            switch (cmd)
+            {
+                case CMD_DFU:
+                    p_ns = KISSM_STATEREF(dfu);
+                    break;
+
+                case CMD_SHUNTON:
+                    p_ns = KISSM_STATEREF(shunt);
+                    break;
+
+                case CMD_TESTMODE:
+                    p_ns = KISSM_STATEREF(testmode);
+                    break;
+
+                case CMD_PING:
+                    led_oneshot(LED_GREEN, 1000);   // green LED on for 1 sec
+                    break;
+            }
+            break;
+        }
+
+        // handle state timeout
+        // means there has been no activity so need to sleep
+        case EVT_TIMEOUT:
+        {
+            p_ns = KISSM_STATEREF(sleep);
+            break;
+        }
+
+        // if not other event, then monitor for activity and keep awake
+        // as long as things are happening
+        default:
+        {
+            // if a command was just processed, or if other modules
+            // are current active (packets in processs) then
+            // reset the state timeout
+            if (pkt_is_active() || ser_is_active())
+            {
+                tmr_schedule(&state_tmr, STATE_TMR, 1000, false);
+            }
+
+            break;
+        }
+    }
+    return p_ns;
+}
+
+// enter DFU 8 second delay with slow blink
+// if this node was addressed then the command processor already
+// invoked the boot loader
+// but if not this node, then this delay just ensures the node stays
+// awake long enough for the "other" node to get boot loader started
+//
+// NOTE: this behavior is a legacy of the original design that required
+// the node to continue to repeat all data even if it was not addressed for
+// DFU. The present hardware design does not require this and this state
+// can probably be eliminated
+KISSM_DEFSTATE(dfu)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            tmr_schedule(&state_tmr, STATE_TMR, 8000, false);
+            led_blink(LED_BLUE,  1000, 1000);
+            break;
+        }
+
+        case EVT_TIMEOUT:
+        {
+            p_ns = KISSM_STATEREF(idle);
+            break;
+        }
+
+        case KISSM_EVT_EXIT:
+        default:
+        {
+            break;
+        }
+    }
+    return p_ns;
+}
+
+// state for running shunting mode
+// state will remain active as long as the shunt module is running
+// the shunt module will return indication when it is finished and
+// then this state can exit
+KISSM_DEFSTATE(shunt)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            // enable the WDT so that we cant get stuck in this state
+            wdt_enable(WDTO_1S);
+            shunt_start();  // start the shunt module running
+            break;
+        }
+
+        // if SHUNTOFF command then signal shunt module to stop
+        // we do not actually exit here. the shunt module will indicate
+        // when it is stopped (in the default case below)
+        case EVT_CMD:
+        {
+            uint8_t cmd = ((packet_t *)p_event->data.p)->cmd;;
+            if (cmd == CMD_SHUNTOFF)
+            {
+                shunt_stop();
+            }
+        }
+
+        case KISSM_EVT_EXIT:
+        {
+            // turn off watchdog timer
+            MCUSR = 0;
+            wdt_disable();
+            break;
+        }
+
+        default:
+        {
+            // pet the watchdog
+            // then run the shunt module (must be called continuously)
+            wdt_reset();
+            shunt_status_t sts = shunt_run();
+            if (SHUNT_OFF == sts)
+            {
+                // if shunt stops running, then go back to idle
+                p_ns = KISSM_STATEREF(idle);
+            }
+            break;
+        }
+    }
+
+    return p_ns;
+}
+
+// run the testmode state
+// test mode is already activated by command module
+// this state just keeps it running and monitors for completion
+KISSM_DEFSTATE(testmode)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            // enabled watchdog so we cant get stuck here
+            wdt_enable(WDTO_1S);
+            break;
+        }
+
+        case KISSM_EVT_EXIT:
+        {
+            // turn off watchdog timer
+            MCUSR = 0;
+            wdt_disable();
+            break;
+        }
+
+        default:
+        {
+            // pet the watchdog
+            wdt_reset();
+            // keep the testmode module running
+            testmode_status_t test_sts = testmode_run();
+            // if testmode ends, switch back to idle
+            if (test_sts == TESTMODE_OFF)
+            {
+                p_ns = KISSM_STATEREF(idle);
+            }
+        }
+    }
+
+    return p_ns;
+}
+
+// sleep state
+// activate from idle when there has been no activity
+// processor stops running code during sleep
+KISSM_DEFSTATE(sleep)
+{
+    struct kissm_state *p_ns = NULL;
+
+    switch (p_event->type)
+    {
+        case KISSM_EVT_ENTRY:
+        {
+            adc_powerdown();    // shut down analog circuits
+
+            // force LEDs and external outputs off
+            led_off(LED_BLUE);
+            led_off(LED_GREEN);
+            PORTA &= ~_BV(PORTA3);
+
+            // TODO: this does not turn off external IO, if it was on
+
+            // this is only needed for old boards
+            if (g_board_type < BOARD_TYPE_BMSNODE)
+            {
+                // disable the UART TX (for power saving)
+                UCSR0B &= ~_BV(TXEN0);
+            }
+
+            // go to sleep
+            set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+            sleep_mode();
+
+            // at this point MCU is sleep/pwrdn
+            // when it wakes it resumes execution here
+
+            break;
+        }
+
+        case KISSM_EVT_EXIT:
+        {
+            // WAKING UP
+            // this is only needed for old boards
+            if (g_board_type < BOARD_TYPE_BMSNODE)
+            {
+                // re-enable UART TX
+                UCSR0B |= _BV(TXEN0);
+            }
+            // turn on blue LED to show we wake up
+            led_on(LED_BLUE);
+
+            // re-enable the analog
+            adc_powerup();
+
+            break;
+        }
+
+        default:
+        {
+            // we pass through here after wake up,
+            // signal state machine to switch to idle state
+            p_ns = KISSM_STATEREF(idle);
+            break;
+        }
+    }
+
+    return p_ns;
+}
+
+// system init and main loop
 void main_loop(void)
 {
-    // declaring these as static so that they do not end up on the stack
-    static uint16_t sleep_timeout;
-    static uint16_t adc_timeout;
+    static uint16_t adc_timeout;    // static to keep off the stack
 
-    cli(); // should already be disabled, just to be sure
-    MCUSR = 0; // this has to be done here in order to disable WDT
+    cli();      // should already be disabled, just to be sure
+    MCUSR = 0;  // this has to be done here in order to disable WDT
     wdt_disable();
 
-#if 0 // for now we do not have any dependency on reset cause
-    // take action based on the reason for reset
-    if (reset_cause & WDRF)
-    {
-        // watchdog reset
-    }
-    else if (reset_cause & BORF)
-    {
-        // brownout
-    }
-    else if (reset_cause & EXTRF)
-    {
-        // external reset
-    }
-    else if (reset_cause & PORF)
-    {
-        // power-on reset
-    }
-#endif
+    device_init();  // hardware init
+    cfg_load();     // load node config (global cfg needed for later calls)
 
-    // hardware init of MCU
-    device_init();
-    tmr_init();
-
-    // load the node configuration
-    // it will be loaded into the global configuration structure (see cfg.h)
-    cfg_load();
-
+    // old board style needs this byte sent at init
     if (g_board_type < BOARD_TYPE_BMSNODE)
     {
         // send out one byte on wake (this causes TXC to get set)
         UDR0 = 0x55;
     }
 
-    pkt_reset(); // init packet parser
-    ser_flush(); // init serial module
+    // init the software modules
+    tmr_init();
+    pkt_reset();
+    ser_flush();
 
-    // enable system interrupts
+    // enable interrupts to start things running
     sei();
 
-    // turn on blue LED at the start
+    // turn on LED for aliveness indicator
     led_on(LED_BLUE);
 
-    adc_powerup();  // power up ADC circuitry
+    // power up ADC circuitry
+    adc_powerup();
+    adc_timeout = tmr_set(1);   // cause first ADC conversion to happen soon
+    // TODO: move ADC run timeout to adc module
 
-    // do an initial blink for 1 seconds
-    // with 50 ms toggle
-    // rapid toggle means bms node is starting up
-    sleep_timeout = tmr_set(1000);
-    led_blink(LED_BLUE, 50, 50);
-    while(!tmr_expired(sleep_timeout))
+    // initialize state machine
+    kissm_init(KISSM_STATEREF(powerup));
+
+    // forever loop
+    for (;;)
     {
-        led_run();  // run LED blinker
-    }
+        struct kissm_event evt;
+        packet_t *pkt;
 
-    // leave the blue LED on
-    led_on(LED_BLUE);
-
-    // reset sleep timeout to 1 sec
-    // and blink to 200 msec toggle
-    // start in idle state
-    sleep_timeout = tmr_set(1000);
-    led_blink(LED_BLUE, 200, 200);
-    appstate_t state = STATE_IDLE;
-    adc_timeout = tmr_set(1);   // perform first conversion right away
-
-    // blinky loop
-    while (1)
-    {
-        // run LED blinker
+        // run LED background
         led_run();
 
-        // run adc conversions
+        // run ADC conversions
+        // TODO: should be moved to an adc_run() method
         if (tmr_expired(adc_timeout))
         {
-            adc_timeout += 100;
+            adc_timeout += 1000;
             adc_sample();
         }
 
-        // run the command processor
-        // TODO: consider cmd_process() returning the last command
-        bool b_processed = cmd_process();
-        uint8_t lastcmd = cmd_get_last();
+        // event generator
+        // check for possible events in the system
+        // check first for expiring timers, then incoming commands
+        // default is NONE
+        evt.type = KISSM_EVT_NONE;
+        pkt = NULL;
 
-        // processing per the current app state
-        switch (state)
+        struct tmr *expired = tmr_process();    // any timers expired?
+        if (expired)
         {
-            // IDLE - awake because of activity. remain in this state
-            // until the sleep timeout expires or dfu happens
-            case STATE_IDLE:
-                // if last command was DFU, then go to the DFU state
-                if (lastcmd == CMD_DFU)
-                {
-                    // set a longer sleep timeout for dfu mode,
-                    // and update the blink indicator rate
-                    sleep_timeout = tmr_set(8000);
-                    led_blink(LED_BLUE, 1000, 1000);
-                    state = STATE_DFU;
-                }
+            // if state timeout timer, then generate timeout event
+            if (expired->id == STATE_TMR)
+            {
+                evt.type = EVT_TIMEOUT;
+            }
+            // TODO: add else for other timers if any other timers are added
+        }
+        else    // if no timers, then check commands
+        {
+            pkt =  cmd_process();
+            if (pkt)
+            {
+                evt.type = EVT_CMD;
+                evt.data.p = pkt;
+            }
+        }
 
-                // if shunt command, switch to SHUNT state
-                else if (lastcmd == CMD_SHUNTON)
-                {
-                    shunt_start();
-                    state = STATE_SHUNT;
-                    // in shunt mode, WDT is used to ensure it never
-                    // gets stuck on
-                    wdt_enable(WDTO_1S);
-                }
-
-                // if testmode, switch to TEST state
-                else if (lastcmd == CMD_TESTMODE)
-                {
-                    state = STATE_TEST;
-                    wdt_enable(WDTO_1S);
-                }
-
-                // if last command was PING, turn on green LED for a while
-                else if (lastcmd == CMD_PING)
-                {
-                    led_oneshot(LED_GREEN, 1000);
-                }
-
-                // otherwise, monitor activity and wait for sleep timeout
-                else
-                {
-                    // if a command was just processed, or if other modules
-                    // are current active (packets in processs) then
-                    // reset the sleep timeout
-                    if (b_processed || pkt_is_active() || ser_is_active())
-                    {
-                        sleep_timeout = tmr_set(1000);
-                    }
-
-                    // see if sleep timeout has expired
-                    // if so go to sleep state
-                    else if (tmr_expired(sleep_timeout))
-                    {
-                        state = STATE_SLEEP;
-                    }
-                }
-                break;
-
-            // DFU - in extended wake mode because DFU is happening somewhere
-            case STATE_DFU:
-                // stay in this state until dfu timeout expires
-                if (tmr_expired(sleep_timeout))
-                {
-                    // once the timer expires, drop into idle mode in
-                    // case some other activity happens
-                    sleep_timeout = tmr_set(1000);
-                    led_blink(LED_BLUE, 200, 200);
-                    state = STATE_IDLE;
-                }
-                break;
-
-            // SHUNT - shunt is turned on and being monitored
-            case STATE_SHUNT:
-                wdt_reset();    // not dead yet
-
-                // check if commanded to shut if off
-                if (CMD_SHUNTOFF == lastcmd)
-                {
-                    shunt_stop();   // command it to stop
-                }
-
-                // run the shunt routine
-                // returns current shunt process status
-                shunt_status_t shunt_sts = shunt_run();
-                if (SHUNT_OFF == shunt_sts)
-                {
-                    // shunt has been stopped for some reason
-                    // exit back to idle state
-                    sleep_timeout = tmr_set(1000);
-                    led_blink(LED_BLUE, 200, 200);
-                    state = STATE_IDLE;
-
-                    // turn off the watchdog since we are exiting shunt mode
-                    MCUSR = 0;
-                    wdt_disable();
-                }
-                break;
-
-            // TEST - running testmode until it stops
-            case STATE_TEST:
-                wdt_reset();
-                testmode_status_t test_sts = testmode_run();
-                if (test_sts == TESTMODE_OFF)
-                {
-                    state = STATE_IDLE;
-                    MCUSR = 0;
-                    wdt_disable();
-                }
-                break;
-
-            // SLEEP - going into sleep state to save power
-            // will remain in this state until waken by serial event
-            case STATE_SLEEP:
-                adc_powerdown();    // shut down analog circuits
-
-                // force LED outputs off
-                led_off(LED_BLUE);
-                led_off(LED_GREEN);
-                // force off external load enable
-                PORTA &= ~_BV(PORTA3);
-
-                // this is only needed for old boards
-                if (g_board_type < BOARD_TYPE_BMSNODE)
-                {
-                    // disable the UART TX (for power saving)
-                    UCSR0B &= ~_BV(TXEN0);
-                }
-
-                // go to sleep
-                set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-                sleep_mode();
-
-                // WAKING UP
-                // this is only needed for old boards
-                if (g_board_type < BOARD_TYPE_BMSNODE)
-                {
-                    // re-enable UART TX
-                    UCSR0B |= _BV(TXEN0);
-                }
-                // turn on blue LED to show we wake up
-                led_on(LED_BLUE);
-
-                // DELIBERATE FALL THROUGH
-                // returns us to idle state
-
-            default:
-                adc_powerup();          // turn on the analog circuits
-                sleep_timeout = tmr_set(1000);
-                led_blink(LED_BLUE, 200, 200);
-                adc_timeout = tmr_set(4); // allow some settling time
-                state = STATE_IDLE;
-                break;
+        // run the state machine
+        kissm_run(&evt);
+        if (pkt)
+        {
+            pkt_rx_free(pkt);
         }
 
 #ifdef UNIT_TEST
@@ -386,7 +548,6 @@ void main_loop(void)
             break;
         }
 #endif
-
     }
 }
 

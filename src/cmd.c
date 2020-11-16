@@ -135,7 +135,7 @@ static bool cmd_addr(packet_t *pkt)
         setparm[0] = 1; // address parameter ID
         setparm[1] = pkt->addr;
         cfg_set(2, setparm); // update the global config
-        cfg_store(); // commit the change
+        cfg_store(); // commit the change TODO: still needed?
         return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADDR, pkt->payload, 4);
     }
     // only send reply if the UID matches
@@ -227,18 +227,8 @@ static bool cmd_testmode(packet_t *pkt)
     return cmd_ack(pkt);
 }
 
-static uint8_t last_cmd = 0;
-
-// return the last command received
-uint8_t cmd_get_last(void)
-{
-    uint8_t ret = last_cmd;
-    last_cmd = 0;
-    return ret;
-}
-
 // run command processor
-bool cmd_process(void)
+packet_t *cmd_process(void)
 {
     bool ret = false;
     packet_t *pkt = pkt_ready();
@@ -248,9 +238,11 @@ bool cmd_process(void)
     {
         // save indicator of any DFU command, for any node
         // this is used by app main loop
+        // if command is DFU to any node, we want to return command to
+        // caller. Main loop runs special state if command was DFU
         if (pkt->cmd == CMD_DFU)
         {
-            last_cmd = CMD_DFU;
+            ret = true;
         }
 
         // process ADDR command for any address
@@ -271,10 +263,6 @@ bool cmd_process(void)
         // we have a nodeid so process normally
         else if (pkt->addr == NODEID)
         {
-            // for a command addressed to this node, save the command
-            // for later query
-            last_cmd = pkt->cmd;
-
             switch (pkt->cmd)
             {
                 case CMD_PING:
@@ -282,6 +270,8 @@ bool cmd_process(void)
                     break;
 
                 case CMD_DFU:
+                    // note that actually causes reboot and
+                    // execution does not continue past here
                     ret = cmd_dfu();
                     break;
 
@@ -324,7 +314,23 @@ bool cmd_process(void)
                     break;
             }
         }
-        pkt_rx_free(pkt);
+
+        // if ret is true, it means packet should be returned to caller
+        // caller must free
+        // TODO: consider adding command buffer to return commands instead
+        // then packet buffer could be freed here and it prevents needing to
+        // keep track of packet freeing in two places. However it will use
+        // more RAM
+        if (ret)
+        {
+            return pkt;
+        }
+        else    // not returning to caller so free the packet
+        {
+            pkt_rx_free(pkt);
+        }
     }
-    return ret;
+
+    // getting here means no valid packet is available
+    return NULL;
 }

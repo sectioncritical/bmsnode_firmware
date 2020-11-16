@@ -67,6 +67,7 @@ test:
         - "make -C $BUILD_DIR cleantest"
         - "make -C $BUILD_DIR test"
     artifacts:
+        when: always
         paths:
             - "$TEST_DIR/reports/*.html"
             - "$TEST_DIR/reports/check-badge.svg"
