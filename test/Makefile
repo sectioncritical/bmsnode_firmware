@@ -136,7 +136,7 @@ $(REPORTDIR)/bmstest-coverage.html: $(REPORTS)
 
 # generate cppcheck xml report
 $(REPORTDIR)/check.xml: | $(REPORTDIR)
-	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem -v ../src --xml-version=2 2> $@
+	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem --inline-suppr -v ../src --xml-version=2 2> $@
 
 # generate cppcheck html report
 $(REPORTDIR)/check/index.html: $(REPORTDIR)/check.xml venv | $(REPORTDIR)/check
@@ -150,7 +150,7 @@ $(REPORTDIR)/check-badge.svg: $(REPORTDIR)/check.xml venv
 # run cppcheck with plain output - useful for local running, and no reports
 .PHONY: check
 check:
-	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem -v ../src
+	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem --inline-suppr -v ../src
 
 .PHONY: report
 report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg checkunit

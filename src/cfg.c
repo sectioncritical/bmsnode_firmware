@@ -208,10 +208,12 @@ bool cfg_set(uint8_t len, uint8_t *p_value)
         // copy bytes from input directly into parms structure
         // since, for now, they are all either 1 or 2 bytes, we only
         // need to check for 2
+        // cppcheck-suppress[objectIndex]
         p_cfg[idx] = p_value[1]; // first byte of value
         if (cnt == 2)
         {
             // copy second byte if there is one
+            // cppcheck-suppress[objectIndex]
             p_cfg[idx + 1] = p_value[2];
         }
 
@@ -257,10 +259,12 @@ uint8_t cfg_get(uint8_t len, uint8_t *p_buf)
         // copy bytes from parms structure into the caller-buffer
         // since, for now, they are all either 1 or 2 bytes, we only
         // need to check for 2
+        // cppcheck-suppress[objectIndex]
         p_buf[1] = p_cfg[idx]; // first byte of value
         if (cnt == 2)
         {
             // copy second byte if there is one
+            // cppcheck-suppress[objectIndex]
             p_buf[2] = p_cfg[idx + 1];
         }
         return cnt + 1; // payload length (includes parm id)

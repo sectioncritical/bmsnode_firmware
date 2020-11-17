@@ -28,7 +28,7 @@ RUN apt-get update \
     && npm install --global state-machine-cat
 
 # build cppcheck
-RUN git clone -b 1.90 --depth=1 https://github.com/danmar/cppcheck.git \
+RUN git clone -b 2.2 --depth=1 https://github.com/danmar/cppcheck.git \
     && cd cppcheck \
     && make MATCHCOMPILER=yes FILESDIR=/usr/share/cppcheck HAVE_RULES=yes CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function" install \
     && cd .. && rm -rf cppcheck

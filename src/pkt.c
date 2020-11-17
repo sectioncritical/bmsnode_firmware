@@ -190,6 +190,7 @@ bool pkt_send(uint8_t flags, uint8_t addr, uint8_t cmd,
     // could be more efficient with count down loop
     for (idx = 0; idx < 4; ++idx)
     {
+        // cppcheck-suppress[objectIndex]
         crc = _crc8_ccitt_update(crc, ((uint8_t *)&txpkt.pkt)[idx]);
     }
 

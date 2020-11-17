@@ -230,12 +230,13 @@ static bool cmd_testmode(packet_t *pkt)
 // run command processor
 packet_t *cmd_process(void)
 {
-    bool ret = false;
     packet_t *pkt = pkt_ready();
 
     // valid packet
     if (pkt)
     {
+        bool ret = false;
+
         // save indicator of any DFU command, for any node
         // this is used by app main loop
         // if command is DFU to any node, we want to return command to
