@@ -4,6 +4,27 @@
 
 <!--- next entry here -->
 
+## 0.10.0
+2020-11-20
+
+### Features
+
+- add LED abstraction (83b7cf23c54677f906d4fe7183a3ea36e00363f9)
+- add list helper module (192158985f4fd856bf4a817ad04fa97d9401f342)
+- add scheduled timers (b97bfb179dad8c550958e9efee8824fbba3d0272)
+- change rate to 9600 [skip ci] (4c648204e52240b196c83ebb81f44e276505d6af)
+- **shunt:** use PWM for shunt with temp limit #46 ... (6b1fc0c2f4c6c314012abe22d0b141fecc64ca70)
+
+### Fixes
+
+- add new v2.0 boards to utils (5ea10c7d8377e02a46e3715a97ae2d6ccb02eb1d)
+- update bootloader hex files with latest optiboot version [skip ci] (786e85ef6c7f703e1141ca28171034af07e43c82)
+- parameters not being stored #54 (707c34b3d10cb25dc1c8858e91fb9a1d7935cb54)
+- reduce app startup blink timeout from 5 to 1 seconds (850e9c3c3ec15ff5742023f1b71a9fe7285a3fa9)
+- convert main loop to state machine (00803927f8f014e3f7a9dac955dcea90e9b61e93)
+- clean up and improve documentation, add gitlab pages (1f392fb8b6c6dc6547fc4d928a29b888be3119ee)
+- clean up some cppcheck warnings (36d594b48561e57a2503d5ad2428e3d98ad5218b)
+
 ## 0.9.0
 2020-09-17
 
