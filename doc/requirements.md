@@ -375,6 +375,7 @@ is subject to the release process and release testing.
 |   0.7   |Automatic shunt mode                                     |
 |   0.8   |Support new board design (1.0.0 boards)                  |
 |   0.9   |Switch to 2400, until hardware improves                  |
-|   0.9.x |Feature refinement                                       |
+|   0.10  |Shunt PWM                                                |
+|   0.10.x|Feature refinement and bug fixing                        |
 |   1.0   |First production release                                 |
 

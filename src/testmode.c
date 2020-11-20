@@ -29,6 +29,7 @@
 
 #include "tmr.h"
 #include "adc.h"
+#include "shunt.h"
 #include "testmode.h"
 
 // convenience macros for controlling IO pins
@@ -67,6 +68,7 @@ void testmode_off(void)
     // just turn it all off
     VREF_OFF;
     IO_OFF;
+    shunt_stop();
     SHUNT_OFF;
     GREEN_OFF;
     BLUE_OFF;
@@ -74,7 +76,7 @@ void testmode_off(void)
 }
 
 // start a specific test mode
-void testmode_on(testmode_status_t testfunc)
+void testmode_on(testmode_status_t testfunc, uint8_t val0, uint8_t val1)
 {
     test_seconds = 0;               // seconds counter
     test_timeout = tmr_set(1000);   // 1 second tick
@@ -96,7 +98,8 @@ void testmode_on(testmode_status_t testfunc)
             break;
 
         case TESTMODE_SHUNT:        // turn on shunt load
-            SHUNT_ON;
+            shunt_start();
+            shunt_set(val0);
             break;
 
         case TESTMODE_BLINK:        // run LED blink pattern

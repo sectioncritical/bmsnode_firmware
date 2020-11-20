@@ -51,28 +51,57 @@ config_t g_cfg_parms;
 
 }
 
-#define SHUNT_PIN_STATE (PORTA & 0x08)
-
 TEST_CASE("shunt start")
 {
     RESET_FAKE(tmr_set);
     tmr_set_fake.return_val = 1000;
     shunt_stop(); // place in known state
-    CHECK(shunt_status() == SHUNT_OFF);
-    CHECK_FALSE(SHUNT_PIN_STATE);
+    CHECK(shunt_get_status() == SHUNT_OFF);
     shunt_start();
-    CHECK(tmr_set_fake.call_count == 1);
-    CHECK(shunt_status() == SHUNT_IDLE);
-    CHECK_FALSE(SHUNT_PIN_STATE);
+    CHECK(tmr_set_fake.call_count == 2); // tmr_set called by start and get_status
+    CHECK(shunt_get_status() == SHUNT_IDLE);
+    CHECK(shunt_get_pwm() == 0);
+    CHECK(OCR1BH == 0);
+    CHECK(OCR1BL == 0);
 }
 
 TEST_CASE("shunt stop")
 {
     shunt_start(); // gets into known state
-    CHECK(shunt_status() == SHUNT_IDLE);
+    CHECK(shunt_get_status() == SHUNT_IDLE);
     shunt_stop();
-    CHECK(shunt_status() == SHUNT_OFF);
-    CHECK_FALSE(SHUNT_PIN_STATE);
+    CHECK(shunt_get_status() == SHUNT_OFF);
+}
+
+TEST_CASE("shunt idle timeout")
+{
+    RESET_FAKE(tmr_expired);
+    RESET_FAKE(adc_get_cellmv);
+    RESET_FAKE(adc_get_tempC);
+
+    tmr_expired_fake.return_val = false;
+    adc_get_cellmv_fake.return_val = 4050;
+    adc_get_tempC_fake.return_val = 30;
+
+    // set shunt related config item defaults
+    g_cfg_parms.shuntmax = 4100;;
+    g_cfg_parms.shuntmin = 4000;
+    g_cfg_parms.shunttime = 300; // 5 minutes
+    g_cfg_parms.temphi = 50;
+    g_cfg_parms.templo = 40;
+    g_cfg_parms.tempadj = 0;
+
+    shunt_start(); // gets into known state
+    enum shunt_status status = shunt_get_status();
+    CHECK(status == SHUNT_IDLE);
+    status = shunt_run();
+    CHECK(status == SHUNT_ON);
+    CHECK(shunt_get_pwm() == 128);
+
+    tmr_expired_fake.return_val = true;
+    status = shunt_run();
+    CHECK(status == SHUNT_OFF);
+    CHECK(shunt_get_pwm() == 0);
 }
 
 TEST_CASE("shunt run starting conditions")
@@ -87,23 +116,25 @@ TEST_CASE("shunt run starting conditions")
     adc_get_tempC_fake.return_val = 30;
 
     // set shunt related config item defaults
-    g_cfg_parms.shunton = 4100;;
-    g_cfg_parms.shuntoff = 4000;
+    g_cfg_parms.shuntmax = 4100;;
+    g_cfg_parms.shuntmin = 4000;
     g_cfg_parms.shunttime = 300; // 5 minutes
     g_cfg_parms.temphi = 50;
     g_cfg_parms.templo = 40;
     g_cfg_parms.tempadj = 0;
 
     shunt_stop();   // place in known state
-    shunt_status_t status;
+    enum shunt_status status;
 
     SECTION("not running")
     {
         status = shunt_run();
         CHECK(status == SHUNT_OFF);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-        // we could check to see that the various fake functions are not
-        // called but that is not important
+        CHECK(adc_get_cellmv_fake.call_count == 0);
+        CHECK(adc_get_tempC_fake.call_count == 0);
+        CHECK(shunt_get_pwm() == 0);
+        CHECK(OCR1BH == 0);
+        CHECK(OCR1BL == 0);
     }
 
     // normal situation
@@ -114,298 +145,164 @@ TEST_CASE("shunt run starting conditions")
         shunt_start();  // turn it on
         status = shunt_run();
         // nominal voltage is below shunt voltage
-        CHECK(status == SHUNT_UNDERVOLT);
+        CHECK(status == SHUNT_IDLE);
         CHECK(tmr_expired_fake.call_count == 1);
         CHECK(adc_get_cellmv_fake.call_count == 1);
         CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE);
         // check again to make sure it stays in this state
         status = shunt_run();
         // nominal voltage is below shunt voltage
-        CHECK(status == SHUNT_UNDERVOLT);
+        CHECK(status == SHUNT_IDLE);
         CHECK(tmr_expired_fake.call_count == 2);
         CHECK(adc_get_cellmv_fake.call_count == 2);
         CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK_FALSE(SHUNT_PIN_STATE);
+        CHECK(shunt_get_pwm() == 0);
+        CHECK(OCR1BH == 0);
+        CHECK(OCR1BL == 0);
     }
 
     // voltage is between high and low limits
-    SECTION("start mid voltage")
+    SECTION("in-range pwm checks")
     {
         // cellv between limits
         adc_get_cellmv_fake.return_val = 4050;
 
         shunt_start();  // turn it on
         status = shunt_run();
-        CHECK(status == SHUNT_IDLE); // v not high enough to start shunting yet
+        CHECK(status == SHUNT_ON); // should be shunting at 50%
         CHECK(tmr_expired_fake.call_count == 1);
         CHECK(adc_get_cellmv_fake.call_count == 1);
         CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE);
+        uint16_t pwm = shunt_get_pwm();
+        CHECK(pwm == 128);
+        CHECK(OCR1BH == 0);
+        CHECK(OCR1BL == 128);
 
         // check again to make sure it stays in this state
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);
+        CHECK(tmr_expired_fake.call_count == 2);
+        CHECK(adc_get_cellmv_fake.call_count == 2);
+        CHECK(adc_get_tempC_fake.call_count == 2);
+        CHECK(shunt_get_pwm() == 128);
+        CHECK(OCR1BH == 0);
+        CHECK(OCR1BL == 128);
+
+        // check additional pwm values
+        adc_get_cellmv_fake.return_val = 4025;
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);
+        CHECK(shunt_get_pwm() == 64);
+        adc_get_cellmv_fake.return_val = 4075;
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);
+        CHECK(shunt_get_pwm() == 192);
+    }
+
+    // check some voltage corner cases
+    SECTION("voltage corner cases")
+    {
+        shunt_start();
+
+        adc_get_cellmv_fake.return_val = 3999;
         status = shunt_run();
         CHECK(status == SHUNT_IDLE);
-        CHECK(tmr_expired_fake.call_count == 2);
-        CHECK(adc_get_cellmv_fake.call_count == 2);
-        CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-    }
+        CHECK(shunt_get_pwm() == 0);
 
-    // voltage over upper limit
-    SECTION("start over voltage")
-    {
-        // cellv above upper limit
-        adc_get_cellmv_fake.return_val = 4200;
+        adc_get_cellmv_fake.return_val = 4000;
+        status = shunt_run();
+        CHECK(status == SHUNT_IDLE);
+        CHECK(shunt_get_pwm() == 0);
 
-        shunt_start();  // turn it on
+        adc_get_cellmv_fake.return_val = 4001;
         status = shunt_run();
         CHECK(status == SHUNT_ON);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE); // pin is turned on
+        CHECK(shunt_get_pwm() == 2);
 
-        // check again to make sure it stays in this state
+        adc_get_cellmv_fake.return_val = 4099;
         status = shunt_run();
         CHECK(status == SHUNT_ON);
-        CHECK(tmr_expired_fake.call_count == 2);
-        CHECK(adc_get_cellmv_fake.call_count == 2);
-        CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK(SHUNT_PIN_STATE);
+        CHECK(shunt_get_pwm() == 253);
+
+        adc_get_cellmv_fake.return_val = 4100;
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);
+        CHECK(shunt_get_pwm() == 255);
+
+        adc_get_cellmv_fake.return_val = 4101;
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);
+        CHECK(shunt_get_pwm() == 255);
+
     }
 
-    // temp is between limits
-    // voltage is low
-    SECTION("start mid temp")
+    // in temp limiting range, but not limited
+    SECTION("in temp range but not limited")
     {
-        // temp between limits
-        adc_get_tempC_fake.return_val = 45;
+        shunt_start();
 
-        shunt_start();  // turn it on
-        status = shunt_run();
-        // mid temp does not trigger over temp, so react to low voltage
-        CHECK(status == SHUNT_UNDERVOLT);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // pin is turned off
-
-        // check again to make sure it stays in this state
-        status = shunt_run();
-        CHECK(status == SHUNT_UNDERVOLT);
-        CHECK(tmr_expired_fake.call_count == 2);
-        CHECK(adc_get_cellmv_fake.call_count == 2);
-        CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-    }
-
-    // temp is above upper limit
-    // voltage low
-    SECTION("start over temp")
-    {
-        // temp above limits
-        adc_get_tempC_fake.return_val = 55;
-
-        shunt_start();  // turn it on
-        status = shunt_run();
-        // high temp triggers overtemp state
-        CHECK(status == SHUNT_OVERTEMP);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // pin is turned off
-
-        // check again to make sure it stays in this state
-        status = shunt_run();
-        CHECK(status == SHUNT_OVERTEMP);
-        CHECK(tmr_expired_fake.call_count == 2);
-        CHECK(adc_get_cellmv_fake.call_count == 2);
-        CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-    }
-
-    // temp above limit
-    // voltage above limit
-    SECTION("start over voltage over temp")
-    {
-        // temp and volts above limits
-        adc_get_tempC_fake.return_val = 55;
-        adc_get_cellmv_fake.return_val = 4200;
-
-        shunt_start();  // turn it on
-        status = shunt_run();
-        // high temp triggers over temp state
-        CHECK(status == SHUNT_OVERTEMP);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // pin is turned off
-
-        // check again to make sure it stays in this state
-        status = shunt_run();
-        CHECK(status == SHUNT_OVERTEMP);
-        CHECK(tmr_expired_fake.call_count == 2);
-        CHECK(adc_get_cellmv_fake.call_count == 2);
-        CHECK(adc_get_tempC_fake.call_count == 2);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-    }
-}
-
-TEST_CASE("shunt run transitions")
-{
-    RESET_FAKE(tmr_expired);
-    RESET_FAKE(adc_get_cellmv);
-    RESET_FAKE(adc_get_tempC);
-
-    // nominal return values for fake functions
-    tmr_expired_fake.return_val = false;
-    adc_get_cellmv_fake.return_val = 3500;
-    adc_get_tempC_fake.return_val = 30;
-
-    // set shunt related config item defaults
-    g_cfg_parms.shunton = 4100;;
-    g_cfg_parms.shuntoff = 4000;
-    g_cfg_parms.shunttime = 300; // 5 minutes
-    g_cfg_parms.temphi = 50;
-    g_cfg_parms.templo = 40;
-    g_cfg_parms.tempadj = 0;
-
-    shunt_stop();   // place in known state
-    shunt_status_t status;
-
-    // start out at low volt
-    // voltage rises to mid, then high
-    // then drops to mid then low
-    // verify shunting starts and stops as expected
-    SECTION("nominal shunt on/off")
-    {
-        shunt_start();  // turn it on
-        status = shunt_run();
-        // nominal voltage is below shunt voltage
-        CHECK(status == SHUNT_UNDERVOLT);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE);
-
-        // now voltage rises above lower limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
         adc_get_cellmv_fake.return_val = 4050;
+        adc_get_tempC_fake.return_val = 42;
         status = shunt_run();
-        CHECK(status == SHUNT_IDLE); // changed to idle status
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // still off
-
-        // now voltage rises above upper limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4150;
-        status = shunt_run();
-        CHECK(status == SHUNT_ON); // changed to on
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE); // turned on
-
-        // voltage drop below upper limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4020;
-        status = shunt_run();
-        CHECK(status == SHUNT_ON); // stays on
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE); // turned on
-
-        // voltage drop below lower limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 3900;
-        status = shunt_run();
-        CHECK(status == SHUNT_UNDERVOLT); // low voltage
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // turned off
+        CHECK(status == SHUNT_ON);
+        CHECK(shunt_get_pwm() == 128);
     }
 
-    // over temperature while shunting
-    // temp rises to mid, then high
-    // then drop back down
-    // verify shunting stops and restarts as expected
-    SECTION("overtemp while shunting")
+    // in temp limiting range, with some limiting
+    SECTION("temp limiting")
     {
-        adc_get_cellmv_fake.return_val = 4200; // high voltage
-        shunt_start();  // turn it on
-        status = shunt_run();
-        // shunting should be turned on
-        CHECK(status == SHUNT_ON);
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE);
+        shunt_start();
 
-        // now temp rises above lower limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4200; // high voltage
-        adc_get_tempC_fake.return_val = 45;
+        adc_get_cellmv_fake.return_val = 4050;
+        adc_get_tempC_fake.return_val = 47;
         status = shunt_run();
-        CHECK(status == SHUNT_ON); // stays on
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE);
+        CHECK(status == SHUNT_LIMIT);
+        // voltage based should give 50% PWM
+        // but temp should limit it to ~25%
+        CHECK(shunt_get_pwm() == 76);
+    }
 
-        // now temp rises above upper limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4200; // high voltage
-        adc_get_tempC_fake.return_val = 55;
-        status = shunt_run();
-        CHECK(status == SHUNT_OVERTEMP); // changed to overtemp
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // turned off
+    // temp limiting corner cases
+    SECTION("temp limiting corner cases")
+    {
+        shunt_start();
 
-        // temp drop below upper limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4200; // high voltage
-        adc_get_tempC_fake.return_val = 41;
-        status = shunt_run();
-        CHECK(status == SHUNT_OVERTEMP); // remains in overtemp status
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK_FALSE(SHUNT_PIN_STATE); // still off
+        // initial pwm based on voltage should be 100$ (255)
+        adc_get_cellmv_fake.return_val = 4100;
 
-        // temp drop below lower limit
-        RESET_FAKE(tmr_expired);
-        RESET_FAKE(adc_get_cellmv);
-        RESET_FAKE(adc_get_tempC);
-        adc_get_cellmv_fake.return_val = 4200; // high voltage
         adc_get_tempC_fake.return_val = 39;
         status = shunt_run();
-        CHECK(status == SHUNT_ON); // back to shunting on
-        CHECK(tmr_expired_fake.call_count == 1);
-        CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
-        CHECK(SHUNT_PIN_STATE); // turned on again
+        CHECK(status == SHUNT_ON);  // no limiting yet
+        CHECK(shunt_get_pwm() == 255);
+
+        adc_get_tempC_fake.return_val = 40;
+        status = shunt_run();
+        CHECK(status == SHUNT_ON);  // no limiting yet
+        CHECK(shunt_get_pwm() == 255);
+
+        adc_get_tempC_fake.return_val = 42;
+        status = shunt_run();
+        CHECK(status == SHUNT_LIMIT);
+        CHECK(shunt_get_pwm() == 204);
+
+        adc_get_tempC_fake.return_val = 45;
+        status = shunt_run();
+        CHECK(status == SHUNT_LIMIT);
+        CHECK(shunt_get_pwm() == 128);
+
+        adc_get_tempC_fake.return_val = 49;
+        status = shunt_run();
+        CHECK(status == SHUNT_LIMIT);
+        CHECK(shunt_get_pwm() == 25);
+
+        adc_get_tempC_fake.return_val = 50;
+        status = shunt_run();
+        CHECK(status == SHUNT_LIMIT);
+        CHECK(shunt_get_pwm() == 0);
+
+        adc_get_tempC_fake.return_val = 51;
+        status = shunt_run();
+        CHECK(status == SHUNT_LIMIT);
+        CHECK(shunt_get_pwm() == 0);
     }
-
-
 }

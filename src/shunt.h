@@ -37,14 +37,14 @@ extern "C" {
 /**
  * shunt API return codes.
  */
-typedef enum
+enum shunt_status
 {
     SHUNT_OFF = 0,      ///< shunt process is turned off
     SHUNT_IDLE,         ///< enabled but not currently shunting
-    SHUNT_ON,           ///< shunt resistors turned on
-    SHUNT_UNDERVOLT,    ///< below lower voltage limit
-    SHUNT_OVERTEMP      ///< temperature limit exceeded
-} shunt_status_t;
+    SHUNT_ON,           ///< active shunting
+    SHUNT_NOTUSED,      ///< unused (deprecated undervolt)
+    SHUNT_LIMIT         ///< shunting limited by temperature
+};
 
 /**
  * Start cell shunting mode.
@@ -70,7 +70,27 @@ extern void shunt_stop(void);
  *
  * @return The current status of the shunt process. See \ref shunt_status_t
  */
-extern shunt_status_t shunt_status(void);
+extern enum shunt_status shunt_get_status(void);
+
+/**
+ * Get the PWM setting.
+ *
+ * Returns the value used for PWM setting. The range is 0-255, where 255
+ * represents 100% duty cycle.
+ *
+ * @return The current PWM setting as 8-bit value.
+ */
+extern uint8_t shunt_get_pwm(void);
+
+/**
+ * Set the PWM level (out of 255).
+ *
+ * This is used to set the PWM duty cycle as an 8-bit value (255=>100%).
+ *
+ * @note This is provided as a public API for now, but cant really be used for
+ * manual PWM setting at this time.
+ */
+extern void shunt_set(uint8_t newpwm);
 
 /**
  * Run shunt mode monitoring process.
@@ -79,17 +99,28 @@ extern shunt_status_t shunt_status(void);
  * If this function is not called periodically, the cell boards could overheat
  * and cause damage to the boards and possibly the cells.  It will monitor
  * various conditions such as cell voltage and temperature to help prevent
- * overheating or over draining the cells. The shunt resistors will be turned
- * on or off as necessary to maintain the temperature and voltage limits. If
- * there is no activity for a certain amount of time (see \ref
- * config_t.shunttime) then the shunt mode will be turned off. While in shunt
- * mode, the BMSNode board does not use any power saving mode and thus will
- * eventually drain the cell faster that when in non-shunting mode.
+ * overheating or over draining the cells.
+ *
+ * The shunt load resistor is regulated using PWM. The duty cycle is increased
+ * as the voltage rises above the configurable lower voltage limit. It will be
+ * 100% when the voltage reaches the upper limit.
+ *
+ * Temperature is also measured and used to limit the maximum allowable PWM
+ * duty cycle. As the temperature rises above the lower limit, the PWM will be
+ * limited, starting at 100% and droppping to 0% if the temperature reaches
+ * the maximum limit.
+ *
+ * While in shunt mode, the BMSNode board does not use any power saving mode
+ * and thus will eventually drain the cell faster that when in non-shunting
+ * mode.
+ *
+ * While in shunt mode, shunt_get_status() must be called at least every 30
+ * seconds, or shunt mode will timeout and turn off.
  *
  * @return the current status of the shunt process. This is the same value
- * returned from shunt_status().
+ * returned from shunt_get_status().
  */
-extern shunt_status_t shunt_run(void);
+extern enum shunt_status shunt_run(void);
 
 #ifdef __cplusplus
 }

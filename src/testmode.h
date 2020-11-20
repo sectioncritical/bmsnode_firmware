@@ -57,6 +57,8 @@ extern void testmode_off(void);
  * Turn on test mode for specified test function.
  *
  * @param testmode the test function to activate
+ * @param val0 function dependent parameter (see command docs)
+ * @param val1 function dependent parameter
  *
  * Test mode will be started for the function specified by *testmode*
  * parameter. Only one test function can be active at a time. Other BMSNode
@@ -67,7 +69,7 @@ extern void testmode_off(void);
  * Once test mode is turned on, testmode_run() must be called frequently to
  * monitor and run the test function.
  */
-extern void testmode_on(testmode_status_t testmode);
+extern void testmode_on(testmode_status_t testmode, uint8_t val0, uint8_t val1);
 
 /**
  * Run test mode function and monitoring.

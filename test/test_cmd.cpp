@@ -59,11 +59,12 @@ FAKE_VALUE_FUNC(uint16_t*, adc_get_raw);
 FAKE_VALUE_FUNC(uint16_t, adc_get_cellmv);
 FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
-FAKE_VALUE_FUNC(uint8_t, shunt_status);
+FAKE_VALUE_FUNC(uint8_t, shunt_get_status);
+FAKE_VALUE_FUNC(uint8_t, shunt_get_pwm);
 FAKE_VOID_FUNC(swreset);
 
 FAKE_VOID_FUNC(testmode_off);
-FAKE_VOID_FUNC(testmode_on, testmode_status_t);
+FAKE_VOID_FUNC(testmode_on, testmode_status_t, uint8_t, uint8_t);
 
 // this normally exists in the cfg module. fake it here
 config_t g_cfg_parms;
@@ -514,14 +515,16 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 5);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x80); // 0xD80 = 3456d
         CHECK(pkt_send_payload[1] == 0x0D);
         CHECK(pkt_send_payload[2] == 0x1F);
         CHECK(pkt_send_payload[3] == 0x0);  // 0x001F = 31d
+        CHECK(pkt_send_payload[4] == 0);    // shunt status off
+        CHECK(pkt_send_payload[5] == 0);    // pwm 0
     }
 
     SECTION("temperature > 8 bits")
@@ -545,14 +548,16 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 5);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0x2C);
         CHECK(pkt_send_payload[3] == 0x01);
+        CHECK(pkt_send_payload[4] == 0);
+        CHECK(pkt_send_payload[5] == 0);
     }
 
     SECTION("negative temperature")
@@ -576,14 +581,16 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 5);
+        CHECK(pkt_send_fake.arg4_val == 6);
 
         // check payload
-        CHECK(pkt_send_payload_len == 5);
+        CHECK(pkt_send_payload_len == 6);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0xE7);
         CHECK(pkt_send_payload[3] == 0xFF);
+        CHECK(pkt_send_payload[4] == 0);
+        CHECK(pkt_send_payload[5] == 0);
     }
 }
 

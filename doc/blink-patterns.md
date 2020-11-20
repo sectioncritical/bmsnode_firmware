@@ -34,6 +34,8 @@ except for the PING command.
 |-------|-------------------|-----------------------------------|
 |START  |50 ms for 1 sec    |Main app has just started due to reset, or power on. Follows boot loader. No response to commands during this time.|
 |ACTIVE |200 ms for >= 1 sec|Handling serial bus activity or processing commands.|
+|SHUNT  |800ms on 200ms off |Operating in shunt mode            |
+|TESTMODE|200ms on 800ms off|Operating in test mode             |
 |DFUWAKE|1 s for 8 seconds  |DFU wake. Node stay awake for 8 seconds to relay DFU messages.|
 |SLEEP  | OFF               |Sleeping, in power saving mode.    |
 

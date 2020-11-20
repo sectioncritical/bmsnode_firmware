@@ -47,6 +47,10 @@ FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
 
 FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
+FAKE_VOID_FUNC(shunt_start);
+FAKE_VOID_FUNC(shunt_stop);
+FAKE_VOID_FUNC(shunt_set, uint8_t);
+
 // fake the config module
 config_t g_cfg_parms;
 

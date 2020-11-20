@@ -145,14 +145,15 @@ static bool cmd_addr(packet_t *pkt)
 // implement STATUS command
 static bool cmd_status(void)
 {
-    uint8_t pld[5];
+    uint8_t pld[6];
     uint16_t mvolts = adc_get_cellmv();
     pld[0] = mvolts;
     pld[1] = mvolts >> 8;
     int16_t tempC = adc_get_tempC();
     pld[2] = tempC;
     pld[3] = tempC >> 8;
-    pld[4] = shunt_status();
+    pld[4] = shunt_get_status();
+    pld[5] = shunt_get_pwm();
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, sizeof(pld));
 }
 
@@ -216,7 +217,14 @@ static bool cmd_testmode(packet_t *pkt)
         // verify the enable key is present in the payload
         if ((pkt->payload[1] == 0xCA) && (pkt->payload[2] == 0xFE))
         {
-            testmode_on(pkt->payload[0]);
+            if (pkt->len == 5)
+            {
+                testmode_on(pkt->payload[0], pkt->payload[3], pkt->payload[4]);
+            }
+            else
+            {
+                testmode_on(pkt->payload[0], 0, 0);
+            }
         }
 
     }

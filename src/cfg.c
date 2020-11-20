@@ -137,8 +137,8 @@ bool cfg_load(void)
     g_cfg_parms.toffset = 0;
     g_cfg_parms.xscale = 0;
     g_cfg_parms.xoffset = 0;
-    g_cfg_parms.shunton = 4100;;
-    g_cfg_parms.shuntoff = 4000;
+    g_cfg_parms.shuntmax = 4100;;
+    g_cfg_parms.shuntmin = 4000;
     g_cfg_parms.shunttime = 300; // 5 minutes
     g_cfg_parms.temphi = 50;
     g_cfg_parms.templo = 40;

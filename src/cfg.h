@@ -51,8 +51,8 @@ typedef struct __attribute__ ((__packed__))
     int16_t   toffset;  ///< temperature calibration offset (TBD)
     uint16_t  xscale;   ///< external sensor calibration scaler (TBD)
     int16_t   xoffset;  ///< external sensor calibration offset (TBD)
-    uint16_t  shunton;  ///< shunt turn-on millivolts
-    uint16_t  shuntoff; ///< shunt turn-off millivolts (should be <= shunton)
+    uint16_t  shuntmax; ///< shunt upper voltage, in millivolts
+    uint16_t  shuntmin; ///< shunt lower voltage threshold, in millivolts
     uint16_t  shunttime;///< shunt inactivity timeout in seconds
     int8_t    temphi;   ///< temperature regulation upper limit in C
     int8_t    templo;   ///< temperature regulation lower limit in C  (should be < temphi)

@@ -29,7 +29,7 @@ PROGNAME=bmsnode
 PKG?=0.0.0
 
 # default serial data rate
-BAUD?=4800
+BAUD?=9600
 
 # AVRDUDE ports
 # you will need to override these for your system. The easiest thing to do

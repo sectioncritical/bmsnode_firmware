@@ -3,6 +3,8 @@
 
 #include <avr/io.h>
 
+#define REG8(n) volatile uint8_t n = 0
+
 volatile uint8_t UCSR0B = 0;
 volatile uint8_t UCSR0A = 0;
 volatile uint8_t UCSR0C = 0;
@@ -31,6 +33,15 @@ volatile uint8_t ADCL = 0;
 volatile uint8_t ADCSRA = 0;
 volatile uint8_t DIDR0 = 0;
 volatile uint8_t DIDR1 = 0;
+volatile uint8_t TOCPMSA1 = 0;
+volatile uint8_t TOCPMSA0 = 0;
+volatile uint8_t TOCPMCOE = 0;
+volatile uint8_t TCCR1A = 0;
+volatile uint8_t TCCR1B = 0;
+REG8(OCR1AH);
+REG8(OCR1AL);
+REG8(OCR1BH);
+REG8(OCR1BL);
 
 volatile bool global_int_flag = false;
 

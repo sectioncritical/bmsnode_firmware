@@ -63,10 +63,10 @@
  * |  A0  | 13  | AI | ADC external reference             |
  * |  A1  | 12  | AO | UART0 TX                           |
  * |  A2  | 11  | AI | UART0 RX                           |
- * |  A3  | 10  | O  | GPIO load enable                   |
+ * |  A3  | 10  | AO | GPIO load enable          (TOCC2)  |
  * |  A4  |  9  | AI | ADC4 internal temp sensor (ISP SCK)|
- * |  A5  |  8  | O  | GPIO blue LED (ISP MISO)           |
- * |  A6  |  7  | O  | GPIO green LED (ISP MOSI)          |
+ * |  A5  |  8  | O  | GPIO blue LED (ISP MISO)  (TOCC4)  |
+ * |  A6  |  7  | O  | GPIO green LED (ISP MOSI) (TOCC5)  |
  * |  A7  |  6  | O  | GPIO ref enable (needs high drive) |
  * |  B0  |  2  | AI | ADC11 external temp sensor         |
  * |  B1  |  3  | I/O| GPIO spare external                |
@@ -81,7 +81,7 @@ void device_init(void)
     uint8_t boardtype = cfg_board_type();
 
     // turn off peripherals we are not using
-    PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI) | _BV(PRTIM2) | _BV(PRTIM1);
+    PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI) | _BV(PRTIM2);
 
     // turn off analog comparators
     ACSR0A = 0x80;
@@ -302,19 +302,19 @@ KISSM_DEFSTATE(shunt)
         {
             // enable the WDT so that we cant get stuck in this state
             wdt_enable(WDTO_1S);
+            led_blink(LED_BLUE, 800, 200);
             shunt_start();  // start the shunt module running
             break;
         }
 
         // if SHUNTOFF command then signal shunt module to stop
-        // we do not actually exit here. the shunt module will indicate
-        // when it is stopped (in the default case below)
         case EVT_CMD:
         {
             uint8_t cmd = ((packet_t *)p_event->data.p)->cmd;;
             if (cmd == CMD_SHUNTOFF)
             {
                 shunt_stop();
+                p_ns = KISSM_STATEREF(idle);
             }
         }
 
@@ -328,10 +328,9 @@ KISSM_DEFSTATE(shunt)
 
         default:
         {
-            // pet the watchdog
-            // then run the shunt module (must be called continuously)
-            wdt_reset();
-            shunt_status_t sts = shunt_run();
+            // run the shunt module (must be called continuously)
+            enum shunt_status sts = shunt_run();
+            wdt_reset();        // prevent watchdog reset
             if (SHUNT_OFF == sts)
             {
                 // if shunt stops running, then go back to idle
@@ -357,6 +356,7 @@ KISSM_DEFSTATE(testmode)
         {
             // enabled watchdog so we cant get stuck here
             wdt_enable(WDTO_1S);
+            led_blink(LED_BLUE, 200, 800);
             break;
         }
 

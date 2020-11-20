@@ -70,7 +70,7 @@ FAKE_VOID_FUNC(adc_powerdown);
 FAKE_VOID_FUNC(adc_sample);
 FAKE_VOID_FUNC(shunt_start);
 FAKE_VOID_FUNC(shunt_stop);
-FAKE_VALUE_FUNC(shunt_status_t, shunt_run);
+FAKE_VALUE_FUNC(enum shunt_status, shunt_run);
 FAKE_VALUE_FUNC(testmode_status_t, testmode_run);
 FAKE_VOID_FUNC(led_run);
 FAKE_VOID_FUNC(led_on, enum led_index);
