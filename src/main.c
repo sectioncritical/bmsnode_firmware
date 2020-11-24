@@ -503,7 +503,7 @@ void main_loop(void)
         // TODO: should be moved to an adc_run() method
         if (tmr_expired(adc_timeout))
         {
-            adc_timeout += 1000;
+            adc_timeout += 100;
             adc_sample();
         }
 
