@@ -81,7 +81,7 @@ void shunt_start(void)
     // clear on OC1B match waveform 8-bit mode
     // clock select prescaler /8 ==> gives about 4 kHz
     TCCR1A = _BV(COM1B1) | _BV(WGM10);
-    TCCR1B = _BV(WGM12) | _BV(CS11);
+    TCCR1B = _BV(WGM12) | _BV(CS11) | _BV(CS10);
 
     // set initial PWM to 0
     shunt_set(0);
