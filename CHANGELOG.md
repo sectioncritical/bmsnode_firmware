@@ -4,6 +4,13 @@
 
 <!--- next entry here -->
 
+## 0.10.1
+2020-11-24
+
+### Fixes
+
+- reduce PWM freq to about 500 Hz (12f52fc66e7e79d5671e6a52fa1c08ec3890619c)
+
 ## 0.10.0
 2020-11-20
 
