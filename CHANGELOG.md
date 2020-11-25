@@ -4,6 +4,13 @@
 
 <!--- next entry here -->
 
+## 0.10.2
+2020-11-25
+
+### Fixes
+
+- error in ADC sample timing (7d2f162bb28aeae67cbf1d377a4c83568e7696ef)
+
 ## 0.10.1
 2020-11-24
 
