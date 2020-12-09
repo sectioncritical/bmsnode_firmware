@@ -455,8 +455,6 @@ KISSM_DEFSTATE(sleep)
 // system init and main loop
 void main_loop(void)
 {
-    static uint16_t adc_timeout;    // static to keep off the stack
-
     cli();      // should already be disabled, just to be sure
     MCUSR = 0;  // this has to be done here in order to disable WDT
     wdt_disable();
@@ -484,8 +482,6 @@ void main_loop(void)
 
     // power up ADC circuitry
     adc_powerup();
-    adc_timeout = tmr_set(1);   // cause first ADC conversion to happen soon
-    // TODO: move ADC run timeout to adc module
 
     // initialize state machine
     kissm_init(KISSM_STATEREF(powerup));
@@ -500,12 +496,7 @@ void main_loop(void)
         led_run();
 
         // run ADC conversions
-        // TODO: should be moved to an adc_run() method
-        if (tmr_expired(adc_timeout))
-        {
-            adc_timeout += 100;
-            adc_sample();
-        }
+        adc_run();
 
         // event generator
         // check for possible events in the system

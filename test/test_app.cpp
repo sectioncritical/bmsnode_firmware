@@ -67,7 +67,7 @@ FAKE_VOID_FUNC(tmr_schedule, struct tmr *, uint8_t, uint16_t, bool);
 FAKE_VALUE_FUNC(struct tmr *, tmr_process);
 FAKE_VOID_FUNC(adc_powerup);
 FAKE_VOID_FUNC(adc_powerdown);
-FAKE_VOID_FUNC(adc_sample);
+FAKE_VOID_FUNC(adc_run);
 FAKE_VOID_FUNC(shunt_start);
 FAKE_VOID_FUNC(shunt_stop);
 FAKE_VALUE_FUNC(enum shunt_status, shunt_run);

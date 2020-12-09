@@ -33,10 +33,21 @@
 #include "adc.h"
 #include "cfg.h"
 
-// the following stuff is from C not C++
+// we are using fast-faking-framework for provding fake functions called
+// by serial module.
+// https://github.com/meekrosoft/fff
+#include "fff.h"
+DEFINE_FFF_GLOBALS;
+
+// declare C-type functions
 extern "C" {
 
 config_t g_cfg_parms;
+
+extern void TIMER0_COMPA_vect(void);
+
+FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
+FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
 
 }
 

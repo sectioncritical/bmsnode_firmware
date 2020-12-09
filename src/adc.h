@@ -44,10 +44,13 @@ extern "C" {
 /**
  * Initialize and power up the ADC circuitry.
  *
- * This should be called prior to adc_sample(). It takes about 2-3 ms for the
+ * This should be called prior to adc_run(). It takes about 2-3 ms for the
  * external reference to settle. ADC can be left powered up for as long as
  * samples are needed, but it does cause the board power consumption to
- * increase by about 1-1.5 mA.
+ * increase by about 1-1.5 mA. adc_run() will automatically wait the necessary
+ * time before taking the first sample. However, if adc_sample() is used
+ * directly, then there should be about 3 ms delay after this function and
+ * before adc_sample().
  */
 extern void adc_powerup(void);
 
@@ -57,6 +60,24 @@ extern void adc_powerup(void);
  * Reverses adc_powerup() and turns off ADC related circuits.
  */
 extern void adc_powerdown(void);
+
+/**
+ * Run ADC process to collect periodic samples.
+ *
+ * Before using this function, adc_powerup() should be called at least once,
+ * and at least 3 ms before or the resulting ADC sample data will not be valid.
+ * If ADC is powered down with adc_powerdown(), the adc_powerup() must be used
+ * again before calling this function. It is not necessary to repeatedly call
+ * adc_powerup() if the ADC is left powered.
+ *
+ * This function should be called from the main loop. It will take samples
+ * at a regular interval. It blocks for about 1 ms when a sample is to be
+ * taken. When the sample interval has not yet elapsed, it does not block.
+ *
+ * ADC sample data is stored in an internal cache and can be retreived using
+ * other `adc_get_NNN()` functions.
+ */
+extern void adc_run(void);
 
 /**
  * Sample all the ADC channels and store the result.
@@ -69,6 +90,8 @@ extern void adc_powerdown(void);
  *
  * ADC sample data is stored in an internal cache and can be retreived using
  * other `adc_get_NNN()` functions.
+ *
+ * @deprecated Use adc_run() to collect samples instead of this function.
  *
  * @note This function is blocking until all the ADC channels are sampled.
  * The blocking time is about 1 ms.

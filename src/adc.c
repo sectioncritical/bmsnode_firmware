@@ -29,13 +29,20 @@
 
 #include "thermistor_table.h"
 #include "cfg.h"
+#include "tmr.h"
 #include "adc.h"
+
+// how often to take a sample set
+#define ADC_SAMPLE_PERIOD 100
 
 // channel map - mux channels to sample
 static const uint8_t channels[3] = { 8, 4, 11 };
 
 // storage for sample data
 static uint16_t results[3];
+
+// adc sample timer
+static uint16_t adc_timeout;
 
 //////////
 //
@@ -73,6 +80,9 @@ void adc_powerup(void)
     PORTA |= _BV(PORTA7);   // ext ref turned on
     ADCSRA = _BV(ADEN) | 3; // enable ADC and prescaler 128
     ADMUXB = 0x80;          // use AREF for reference
+
+    // reset the ADC timeout
+    adc_timeout = tmr_set(3);
 }
 
 // shut down ADC and external ref
@@ -103,6 +113,16 @@ void adc_sample(void)
 
         // save result. read low byte first for atomicity
         results[idx] = ADCL | (ADCH << 8);
+    }
+}
+
+// run adc sampling at periodic interval
+void adc_run(void)
+{
+    if (tmr_expired(adc_timeout))
+    {
+        adc_timeout += ADC_SAMPLE_PERIOD;
+        adc_sample();
     }
 }
 
