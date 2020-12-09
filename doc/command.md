@@ -398,8 +398,13 @@ implemented.
 
 ##### Notes
 
-This parameter is read-only, and cannot be changed with the `SETPARM` command.
-Use the `ADDR` command instead.
+This parameter should be read-only, but this is not enforced by firmware.
+Therefore, the controller can set the board address using SETPARM with this
+parameter. However, the reply packet will have the new address which will
+appear to be an error or non-response from the board.
+
+**SETPARM should not be used to set the address parameter.** Use the `ADDR`
+command instead.
 
 #### Parameter VSCALE
 
