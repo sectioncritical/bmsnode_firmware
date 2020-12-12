@@ -52,6 +52,7 @@ FAKE_VALUE_FUNC(bool, pkt_send, uint8_t, uint8_t, uint8_t, uint8_t *, uint8_t);
 FAKE_VALUE_FUNC(uint32_t, cfg_uid);
 FAKE_VALUE_FUNC(uint8_t, cfg_board_type);
 FAKE_VOID_FUNC(cfg_store);
+FAKE_VOID_FUNC(cfg_reset);
 FAKE_VALUE_FUNC(bool, cfg_set,  uint8_t, uint8_t *);
 FAKE_VALUE_FUNC(uint8_t, cfg_get, uint8_t, uint8_t *);
 

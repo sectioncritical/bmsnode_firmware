@@ -691,3 +691,45 @@ be 0. The PWM setting is out of 255. For example to set 50% PWM use a value of
 **WARNING:** when shunt test mode is used there is no thermal regulation. It is
 meant to be used for quick testing and not for extended use. Do not repeatedly
 activate shunt test mode without robust temperature monitoring.
+
+FACTORY (12)
+-----------
+
+### Version Notes
+
+|Version |Notes                          |
+|--------|-------------------------------|
+|`0.10.3`|command introduced             |
+
+### Command
+
+|Byte   |Usage                              |
+|-------|-----------------------------------|
+|CMD    | 12                                |
+|LEN    | 0                                 |
+|PLD    | None                              |
+
+### Response
+
+With reply bit:
+
+|Byte   |Usage |
+|-------|------|
+|CMD    | 12   |
+|LEN    | 0    |
+|PLD    | None |
+
+### Description
+
+Resets the BMSNode configuration to the factory default values.
+
+**WARNING:**
+
+*This will cause the BMSNode to lose it's BUS ID. It will be reset to 0. This
+means that the reply packet will have an address of 0 instead of the Bus ID
+that was used for the command. This might appear to be a non-reply if the
+controller is not expecting it.*
+
+You will need to (re)assign the Bus ID after this.
+
+All calibration parameters will be reset to defaults.

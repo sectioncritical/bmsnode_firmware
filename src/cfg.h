@@ -134,6 +134,11 @@ extern bool cfg_load(void);
 extern void cfg_store(void);
 
 /**
+ * Reset the configuration to defaults.
+ */
+extern void cfg_reset();
+
+/**
  * Set a parameter value from a payload buffer.
  *
  * @param len the payload length of p_value (includes id byte)

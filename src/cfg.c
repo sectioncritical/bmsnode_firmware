@@ -150,12 +150,36 @@ bool cfg_load(void)
 // commit global configuration back to eeprom
 // the header fields are updated
 // and the crc calculated before storing
-void cfg_store(void)
+// if reset is requested, then the crc is forced to be invalid
+// which will cause defaults to be loaded
+static void cfg_commit(bool reset)
 {
     g_cfg_parms.len = sizeof(config_t);
     g_cfg_parms.type = CFG_TYPE_2;
     g_cfg_parms.crc = cfg_compute_crc(&g_cfg_parms);
+    if (reset)
+    {
+        // to reset the config, force crc to be invalid
+        g_cfg_parms.crc = ~g_cfg_parms.crc;
+    }
     eeprom_update_block(&g_cfg_parms, CFG_ADDR, sizeof(config_t));
+    if (reset)
+    {
+        // if reset, then reload to load defaults
+        cfg_load();
+    }
+}
+
+// store the configuration to eeprom
+void cfg_store(void)
+{
+    cfg_commit(false);
+}
+
+// force the configuration to reset to defaults
+void cfg_reset(void)
+{
+    cfg_commit(true);
 }
 
 typedef struct

@@ -109,6 +109,13 @@
  */
 #define CMD_TESTMODE 11
 
+/**
+ * FACTORY command code
+ *
+ * Reset the configuration to factory defaults.
+ */
+#define CMD_FACTORY 12
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -62,7 +62,11 @@ extern void swreset(void);
 // (for commands that just need generic acknowledgement)
 static bool cmd_ack(packet_t *pkt)
 {
-    return pkt_send(PKT_FLAG_REPLY, NODEID, pkt->cmd, NULL, 0);
+    // reply with the address from the packet and not NODEID
+    // normally these will always be the same
+    // but if ID is changed to 0 due to factory reset, then this
+    // reply will still look okay to controller
+    return pkt_send(PKT_FLAG_REPLY, pkt->addr, pkt->cmd, NULL, 0);
 }
 
 // implement DFU command
@@ -316,6 +320,11 @@ packet_t *cmd_process(void)
 
                 case CMD_TESTMODE:
                     ret = cmd_testmode(pkt);
+                    break;
+
+                case CMD_FACTORY:
+                    cfg_reset();
+                    ret = cmd_ack(pkt);
                     break;
 
                 default:
