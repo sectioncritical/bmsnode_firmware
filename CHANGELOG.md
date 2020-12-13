@@ -4,6 +4,17 @@
 
 <!--- next entry here -->
 
+## 0.10.3
+2020-12-13
+
+### Fixes
+
+- clarify SETPARM/ADDR behavior #49 (1ff1358f7e3bff6137f6228bb37dbe225f90a680)
+- move ADC timing to ADC module #60 (8825875b91f37304cfcf5e08ffd34e2c457a6136)
+- **cfg:** add factory reset command #39 (9f9788570d55152e838db2c6d798e3dbfc92f58c)
+- **shunt:** shunt PWM adjustment smoothing #56 (9bd68c4ddca2049f27124d9d1d428418fa753e0e)
+- **adc:** add ADC smoothing #55 (7e6515c5aa090293eaef1981e48ef302ce49cd6b)
+
 ## 0.10.2
 2020-11-25
 
