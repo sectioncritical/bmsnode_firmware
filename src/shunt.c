@@ -36,7 +36,11 @@
 #define TURNOFF (PORTA &= ~_BV(PORTA3))
 #define TURNON (PORTA |= _BV(PORTA3))
 
+// shunt loop adjustment time
+#define SHUNT_LOOP_TIME     100
+
 static uint16_t shunt_timeout;  // shunt idle timeout
+static uint16_t loop_timeout;   // loop timer
 static enum shunt_status shunt_status = SHUNT_OFF;  // current status
 static uint16_t vrange; // range in millivolts, pre-divided by 8
 static uint16_t trange; // range in C (not pre-divided)
@@ -88,10 +92,11 @@ void shunt_start(void)
 
     // at this point the Timer 1 should be running in PWM mode, with 0% output
 
-    // set idle timeout
+    // set idle timeout and initial loop timeout
     shunt_timeout = tmr_set(30000);
+    loop_timeout = tmr_set(1);      // initial pass right away
 
-    // pre-compute the volt and temperature egulating ranges (assume max>min)
+    // pre-compute the volt and temperature regulating ranges (assume max>min)
     vrange = (g_cfg_parms.shuntmax - g_cfg_parms.shuntmin);
     trange = g_cfg_parms.temphi - g_cfg_parms.templo;
 
@@ -148,6 +153,16 @@ enum shunt_status shunt_run(void)
         shunt_stop();
         return SHUNT_OFF;
     }
+
+    // skip if not time yet
+    if (!tmr_expired(loop_timeout))
+    {
+        return shunt_status;
+    }
+
+    // getting here means the loop timeout expired
+    // update the timeout
+    loop_timeout += SHUNT_LOOP_TIME;
 
     // get the latest temperature and voltage
     uint16_t cellmv = adc_get_cellmv();
@@ -207,8 +222,19 @@ enum shunt_status shunt_run(void)
         }
     }
 
-    // set the computed pwm value
-    shunt_set(newpwm);
+    // the newpwm is computed every time through this loop
+    // instead of just setting the new value, adjust toward it
+    // this will smooth out the PWM adjustments
+    int8_t adjust = 0;
+    if (newpwm > pwm)
+    {
+        adjust = 1;
+    }
+    else if (newpwm < pwm)
+    {
+        adjust = -1;
+    }
+    shunt_set(pwm + adjust);
 
     // if the shunt timeout expires, then shut it down
     // this only happens if status is not being requested

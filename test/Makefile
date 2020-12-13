@@ -59,11 +59,20 @@ TEST_KISSM_OBJS=$(addprefix $(OBJDIR)/, $(KISSM_OBJS))
 TESTBINS=$(addprefix $(BINDIR)/, $(TESTS))
 REPORTS=$(addprefix $(REPORTDIR)/, $(addsuffix -junit.xml, $(TESTS)))
 
+# DEBUG=1 on command line will cause C code to be built for debug
+# otherwise use -Os which is the same optimization use for production code
+# (although using a different compiler)
+ifeq ($(DEBUG), 1)
+	DEBUGFLAGS=-g -Og
+else
+	DEBUGFLAGS?=-Os
+endif
+
 CC=gcc
 CXX=g++
 
-CFLAGS=-std=c99 -O0 --coverage -Werror -Wall -DUNIT_TEST -DFWVERSION="{4,9,94}"
-CXXFLAGS=-g -std=c++11 -O0 -Werror -Wall
+CFLAGS=$(DEBUGFLAGS) -std=c99 --coverage -Werror -Wall -DUNIT_TEST -DFWVERSION="{4,9,94}"
+CXXFLAGS=-g -std=c++11 -Og -Werror -Wall
 
 LDFLAGS=--coverage
 
