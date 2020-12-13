@@ -35,6 +35,10 @@
 // how often to take a sample set
 #define ADC_SAMPLE_PERIOD 100
 
+// smoothing filter weight, out of 32
+// 8 ==> smoothing constant of 0.25
+#define FILTER_WEIGHT 8
+
 // channel map - mux channels to sample
 static const uint8_t channels[3] = { 8, 4, 11 };
 
@@ -93,6 +97,14 @@ void adc_powerdown(void)
     PORTA &= ~_BV(PORTA7);
 }
 
+// exponential smoothing of the ADC reading
+static uint16_t adc_filter(uint16_t sample, uint16_t smoothed)
+{
+    smoothed = (sample * FILTER_WEIGHT) + (smoothed * (32 - FILTER_WEIGHT));
+    smoothed = (smoothed + 16) / 32;
+    return smoothed;
+}
+
 // collect a set of ADC samples and store
 // must call adc_powerup() first
 void adc_sample(void)
@@ -112,7 +124,8 @@ void adc_sample(void)
         {}
 
         // save result. read low byte first for atomicity
-        results[idx] = ADCL | (ADCH << 8);
+        uint16_t result = ADCL | (ADCH << 8);
+        results[idx] = adc_filter(result, results[idx]);
     }
 }
 
