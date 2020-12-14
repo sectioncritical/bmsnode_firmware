@@ -1,3 +1,6 @@
 [submodule "util/bmsutil"]
 	path = util/bmsutil
 	url = git@gitlab.com:kroesche/bmsnode_bmsutil.git
+[submodule "doc/build/doxygen-dark-theme"]
+	path = doc/build/doxygen-dark-theme
+	url = https://github.com/MaJerle/doxygen-dark-theme.git
