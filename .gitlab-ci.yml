@@ -6,6 +6,7 @@ stages:
     - release
 
 variables:
+    GIT_SUBMODULE_STRATEGY: normal
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
     BUILD_DIR: "build"
     TEST_DIR: "test"
