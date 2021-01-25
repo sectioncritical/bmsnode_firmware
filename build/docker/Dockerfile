@@ -33,16 +33,16 @@ RUN git clone -b 2.2 --depth=1 https://github.com/danmar/cppcheck.git \
     && make MATCHCOMPILER=yes FILESDIR=/usr/share/cppcheck HAVE_RULES=yes CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function" install \
     && cd .. && rm -rf cppcheck
 
-# build doxygen 1.8.20 from sources
-RUN curl -L -o doxygen-1.8.20.src.tar.gz https://doxygen.nl/files/doxygen-1.8.20.src.tar.gz \
-    && tar -zxf doxygen-1.8.20.src.tar.gz \
-    && cd doxygen-1.8.20 \
+# build doxygen from sources
+RUN curl -L -o doxygen-1.9.1.src.tar.gz https://doxygen.nl/files/doxygen-1.9.1.src.tar.gz \
+    && tar -zxf doxygen-1.9.1.src.tar.gz \
+    && cd doxygen-1.9.1 \
     && mkdir -v build \
     && cd build \
     && cmake -G "Unix Makefiles" \
         -D CMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -Wno-dev .. \
     && make \
     && make install \
-    && cd ../.. && rm -rf doxygen-1.8.20 && rm -f doxygen-1.8.20.src.tar.gz
+    && cd ../.. && rm -rf doxygen-1.9.1 && rm -f doxygen-1.9.1.src.tar.gz
 
 CMD ["/bin/bash"]

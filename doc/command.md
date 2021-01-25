@@ -153,9 +153,10 @@ ADCRAW (5)
 
 ### Version Notes
 
-|Version|Notes                      |
-|-------|---------------------------|
-| `0.5` |command introduced         |
+|Version|Notes                          |
+|-------|-------------------------------|
+| `0.5` |command introduced             |
+| `0.11`|added MCU temperature raw data |
 
 ### Command
 
@@ -172,10 +173,11 @@ With reply bit:
 |Byte    |Usage                         |
 |--------|------------------------------|
 |CMD     | 5                            |
-|LEN     | 6                            |
+|LEN     | 8                            |
 |PLD[1:0]| Cell voltage sample data     |
 |PLD[3:2]| Onboard thermistor sample    |
 |PLD[5:4]| External sensor sample       |
+|PLD[7:6]| MCU temperature sample       |
 
 ### Description
 
@@ -200,6 +202,7 @@ STATUS (6)
 | `0.6` |added shunt flag and fault                                 |
 | `0.7` |replaced shunt flag and fault with single shunt status byte|
 | `0.10`|added shunt PWM data item to reply packet                  |
+| `0.11`|added external and internal (MCU) temperatures             |
 
 ### Command
 
@@ -213,14 +216,16 @@ STATUS (6)
 
 With reply bit:
 
-|Byte    |Usage                                     |
-|--------|------------------------------------------|
-|CMD     | 6                                        |
-|LEN     | 6                                        |
-|PLD[1:0]| Cell voltage millivolts, little-endian   |
-|PLD[3:2]| Temperature in C, signed, little-endian  |
-|PLD[4]  | Shunt status                             |
-|PLD[5]  | Shunt PWM value (0-255)                  |
+|Byte    |Usage                                             |
+|--------|--------------------------------------------------|
+|CMD     | 6                                                |
+|LEN     | 10                                               |
+|PLD[1:0]| Cell voltage millivolts, little-endian           |
+|PLD[3:2]| Board temperature in C, signed, little-endian    |
+|PLD[4]  | Shunt status                                     |
+|PLD[5]  | Shunt PWM value (0-255)                          |
+|PLD[7:6]| External temperature in C, signed, little-endian |
+|PLD[9:8]| Internal temperature in C, signed, little-endian |
 
 ### Description
 

@@ -166,7 +166,7 @@ enum shunt_status shunt_run(void)
 
     // get the latest temperature and voltage
     uint16_t cellmv = adc_get_cellmv();
-    uint16_t tempc = adc_get_tempC();
+    uint16_t tempc = adc_get_tempC(ADC_CH_BOARD_TEMP);
 
     // figure out the PWM based on voltage
     if (cellmv <= g_cfg_parms.shuntmin)

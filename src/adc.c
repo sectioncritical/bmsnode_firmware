@@ -40,10 +40,10 @@
 #define FILTER_WEIGHT 8
 
 // channel map - mux channels to sample
-static const uint8_t channels[3] = { 8, 4, 11 };
+static const uint8_t channels[4] = { 8, 4, 11, 12 };
 
 // storage for sample data
-static uint16_t results[3];
+static uint16_t results[4];
 
 // adc sample timer
 static uint16_t adc_timeout;
@@ -155,7 +155,24 @@ uint16_t adc_get_cellmv(void)
 }
 
 // return the thermistor temperature in C
-int16_t adc_get_tempC(void)
+int16_t adc_get_tempC(enum adc_channel ch)
 {
-    return adc_to_temp(results[1]);
+    if (ch == ADC_CH_MCU_TEMP)
+    {
+        // we are using 1.25V reference instead of 1.1 as required by
+        // MCU temp sensor. So attempt to adjust by using the ratio
+        // 1.25/1.1
+        int16_t mcutemp = results[ch] * 25;
+        mcutemp /= 22;
+        // Per the data sheet, the temp in C is offset by 275
+        // from the ADC value
+        // We are using a value determined by experimentation.
+        // May not be consistent across MCU lots. If we care about this
+        // temperature, we might have to add cal factors for it.
+        return mcutemp - 265;
+    }
+    else
+    {
+        return adc_to_temp(results[ch]);
+    }
 }

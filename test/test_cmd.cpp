@@ -499,16 +499,19 @@ TEST_CASE("STATUS command")
     {
         // this cmd is going to call adc_get_cellmv() and adc_get_tempC()
         adc_get_cellmv_fake.return_val = 3456;
-        adc_get_tempC_fake.return_val = 31; // 31 C
+        // set up 3 return values for adc_get_tempC()
+        int16_t temp_rets[3] = { 31, 32, 33 }; // 31 C, etc
+        SET_RETURN_SEQ(adc_get_tempC, temp_rets, 3);
 
         // send the command packet
         bool ret = cmd_process();
         CHECK(pkt_ready_fake.call_count == 1);
         CHECK(ret);
 
-        // should have called adc_get_cellmv() and adc_get_tempC()
+        // should have called adc_get_cellmv() once
+        // calls adc_get_tempC() 3 times, one for each temp sensor
         CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 3);
 
         // check STATUS reply packet contents
         REQUIRE(pkt_send_fake.call_count == 1);
@@ -516,16 +519,20 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 10);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 10);
         CHECK(pkt_send_payload[0] == 0x80); // 0xD80 = 3456d
         CHECK(pkt_send_payload[1] == 0x0D);
         CHECK(pkt_send_payload[2] == 0x1F);
         CHECK(pkt_send_payload[3] == 0x0);  // 0x001F = 31d
         CHECK(pkt_send_payload[4] == 0);    // shunt status off
         CHECK(pkt_send_payload[5] == 0);    // pwm 0
+        CHECK(pkt_send_payload[6] == 0x20);
+        CHECK(pkt_send_payload[7] == 0x0);  // ext temp sensor
+        CHECK(pkt_send_payload[8] == 0x21);
+        CHECK(pkt_send_payload[9] == 0x0);  // mcu temp
     }
 
     SECTION("temperature > 8 bits")
@@ -541,7 +548,7 @@ TEST_CASE("STATUS command")
 
         // should have called adc_get_cellmv() and adc_get_tempC()
         CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 3);
 
         // check STATUS reply packet contents
         REQUIRE(pkt_send_fake.call_count == 1);
@@ -549,16 +556,20 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 10);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 10);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0x2C);
         CHECK(pkt_send_payload[3] == 0x01);
         CHECK(pkt_send_payload[4] == 0);
         CHECK(pkt_send_payload[5] == 0);
+        CHECK(pkt_send_payload[6] == 0x2C);
+        CHECK(pkt_send_payload[7] == 0x01);
+        CHECK(pkt_send_payload[8] == 0x2C);
+        CHECK(pkt_send_payload[9] == 0x01);
     }
 
     SECTION("negative temperature")
@@ -574,7 +585,7 @@ TEST_CASE("STATUS command")
 
         // should have called adc_get_cellmv() and adc_get_tempC()
         CHECK(adc_get_cellmv_fake.call_count == 1);
-        CHECK(adc_get_tempC_fake.call_count == 1);
+        CHECK(adc_get_tempC_fake.call_count == 3);
 
         // check STATUS reply packet contents
         REQUIRE(pkt_send_fake.call_count == 1);
@@ -582,16 +593,20 @@ TEST_CASE("STATUS command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_STATUS);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 10);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 10);
         CHECK(pkt_send_payload[0] == 0x77);
         CHECK(pkt_send_payload[1] == 0x10);
         CHECK(pkt_send_payload[2] == 0xE7);
         CHECK(pkt_send_payload[3] == 0xFF);
         CHECK(pkt_send_payload[4] == 0);
         CHECK(pkt_send_payload[5] == 0);
+        CHECK(pkt_send_payload[6] == 0xE7);
+        CHECK(pkt_send_payload[7] == 0xFF);
+        CHECK(pkt_send_payload[8] == 0xE7);
+        CHECK(pkt_send_payload[9] == 0xFF);
     }
 }
 
@@ -620,7 +635,7 @@ TEST_CASE("ADCRAW command")
     SECTION("raw ADC values")
     {
         // this cmd is going to call adc_get_raw()
-        uint16_t adcdata[3] = { 0x1234, 0x5678, 0xABCD };
+        uint16_t adcdata[4] = { 0x1234, 0x5678, 0xABCD, 0xDEAD };
         adc_get_raw_fake.return_val = adcdata;
 
         // send the command packet
@@ -637,16 +652,18 @@ TEST_CASE("ADCRAW command")
         CHECK(pkt_send_fake.arg1_val == 1); // pkt addr
         CHECK(pkt_send_fake.arg2_val == CMD_ADCRAW);
         REQUIRE(pkt_send_fake.arg3_val);
-        CHECK(pkt_send_fake.arg4_val == 6);
+        CHECK(pkt_send_fake.arg4_val == 8);
 
         // check payload
-        CHECK(pkt_send_payload_len == 6);
+        CHECK(pkt_send_payload_len == 8);
         CHECK(pkt_send_payload[0] == 0x34);
         CHECK(pkt_send_payload[1] == 0x12);
         CHECK(pkt_send_payload[2] == 0x78);
         CHECK(pkt_send_payload[3] == 0x56);
         CHECK(pkt_send_payload[4] == 0xCD);
         CHECK(pkt_send_payload[5] == 0xAB);
+        CHECK(pkt_send_payload[6] == 0xAD);
+        CHECK(pkt_send_payload[7] == 0xDE);
     }
 }
 

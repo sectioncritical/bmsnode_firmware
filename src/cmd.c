@@ -149,22 +149,28 @@ static bool cmd_addr(packet_t *pkt)
 // implement STATUS command
 static bool cmd_status(void)
 {
-    uint8_t pld[6];
+    uint8_t pld[10];
     uint16_t mvolts = adc_get_cellmv();
     pld[0] = mvolts;
     pld[1] = mvolts >> 8;
-    int16_t tempC = adc_get_tempC();
+    int16_t tempC = adc_get_tempC(ADC_CH_BOARD_TEMP);
     pld[2] = tempC;
     pld[3] = tempC >> 8;
     pld[4] = shunt_get_status();
     pld[5] = shunt_get_pwm();
+    tempC = adc_get_tempC(ADC_CH_EXT_TEMP);
+    pld[6] = tempC;
+    pld[7] = tempC >> 8;
+    tempC = adc_get_tempC(ADC_CH_MCU_TEMP);
+    pld[8] = tempC;
+    pld[9] = tempC >> 8;
     return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_STATUS, pld, sizeof(pld));
 }
 
 // implement ADCRAW command
 static bool cmd_adcraw(void)
 {
-    uint8_t pld[6];
+    uint8_t pld[8];
     uint16_t *p_results = adc_get_raw();
     pld[0] = p_results[0];
     pld[1] = p_results[0] >> 8;
@@ -172,7 +178,9 @@ static bool cmd_adcraw(void)
     pld[3] = p_results[1] >> 8;
     pld[4] = p_results[2];
     pld[5] = p_results[2] >> 8;
-    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADCRAW, pld, 6);
+    pld[6] = p_results[3];
+    pld[7] = p_results[3] >> 8;
+    return pkt_send(PKT_FLAG_REPLY, NODEID, CMD_ADCRAW, pld, sizeof(pld));
 }
 
 // implement SETPARM command

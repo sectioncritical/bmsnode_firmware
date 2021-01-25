@@ -42,6 +42,17 @@ extern "C" {
 #endif
 
 /**
+ * ADC channel index
+ */
+enum adc_channel
+{
+    ADC_CH_CELLV = 0,   ///< cell voltage
+    ADC_CH_BOARD_TEMP,  ///< board temperature
+    ADC_CH_EXT_TEMP,    ///< external temperature
+    ADC_CH_MCU_TEMP     ///< internal MCU temperature
+};
+
+/**
  * Initialize and power up the ADC circuitry.
  *
  * This should be called prior to adc_run(). It takes about 2-3 ms for the
@@ -108,9 +119,14 @@ extern uint16_t adc_get_cellmv(void);
 /**
  * Return the onboard temperature in C.
  *
+ * @param ch the ADC channel for temperature reading
+ *
+ * The parameter *ch* should be a temperature channel. Otherwise the return
+ * value will be meaningless.
+ *
  * @return the onboard thermistor temperature in C, 16-bit signed.
  */
-extern int16_t adc_get_tempC(void);
+extern int16_t adc_get_tempC(enum adc_channel ch);
 
 /**
  * Return the raw ADC data in an array.

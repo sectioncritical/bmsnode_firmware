@@ -181,7 +181,7 @@ testmode_status_t testmode_run(void)
     else if (test_state == TESTMODE_SHUNT)
     {
         // keep an eye on temperature
-        uint16_t tempc = adc_get_tempC();
+        uint16_t tempc = adc_get_tempC(ADC_CH_BOARD_TEMP);
         if (tempc > 60)
         {
             testmode_off();
