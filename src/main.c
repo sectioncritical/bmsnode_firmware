@@ -167,6 +167,7 @@ KISSM_DEFSTATE(powerup)
 
         default:
         {
+            wdt_reset();    // pet the watchdog
             break;
         }
     }
@@ -236,6 +237,7 @@ KISSM_DEFSTATE(idle)
         // as long as things are happening
         default:
         {
+            wdt_reset();    // pet the watchdog
             // if a command was just processed, or if other modules
             // are current active (packets in processs) then
             // reset the state timeout
@@ -282,6 +284,7 @@ KISSM_DEFSTATE(dfu)
         case KISSM_EVT_EXIT:
         default:
         {
+            wdt_reset();    // pet the watchdog
             break;
         }
     }
@@ -300,8 +303,6 @@ KISSM_DEFSTATE(shunt)
     {
         case KISSM_EVT_ENTRY:
         {
-            // enable the WDT so that we cant get stuck in this state
-            wdt_enable(WDTO_1S);
             led_blink(LED_BLUE, 800, 200);
             shunt_start();  // start the shunt module running
             break;
@@ -320,9 +321,6 @@ KISSM_DEFSTATE(shunt)
 
         case KISSM_EVT_EXIT:
         {
-            // turn off watchdog timer
-            MCUSR = 0;
-            wdt_disable();
             break;
         }
 
@@ -354,17 +352,12 @@ KISSM_DEFSTATE(testmode)
     {
         case KISSM_EVT_ENTRY:
         {
-            // enabled watchdog so we cant get stuck here
-            wdt_enable(WDTO_1S);
             led_blink(LED_BLUE, 200, 800);
             break;
         }
 
         case KISSM_EVT_EXIT:
         {
-            // turn off watchdog timer
-            MCUSR = 0;
-            wdt_disable();
             break;
         }
 
@@ -396,6 +389,9 @@ KISSM_DEFSTATE(sleep)
     {
         case KISSM_EVT_ENTRY:
         {
+            // turn off watchdog timer
+            MCUSR = 0;
+            wdt_disable();
             adc_powerdown();    // shut down analog circuits
 
             // force LEDs and external outputs off
@@ -436,6 +432,9 @@ KISSM_DEFSTATE(sleep)
 
             // re-enable the analog
             adc_powerup();
+
+            // re-enable watchdog
+            wdt_enable(WDTO_1S);
 
             break;
         }
@@ -485,6 +484,9 @@ void main_loop(void)
 
     // initialize state machine
     kissm_init(KISSM_STATEREF(powerup));
+
+    // enable the watchdog while state machine is running
+    wdt_enable(WDTO_1S);
 
     // forever loop
     for (;;)
