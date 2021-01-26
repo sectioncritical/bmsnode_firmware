@@ -48,6 +48,11 @@ extern "C" {
 FAKE_VALUE_FUNC(packet_t *, pkt_ready);
 FAKE_VOID_FUNC(pkt_rx_free, packet_t *);
 FAKE_VALUE_FUNC(bool, pkt_send, uint8_t, uint8_t, uint8_t, uint8_t *, uint8_t);
+FAKE_VALUE_FUNC(bool, pkt_is_active);
+FAKE_VOID_FUNC(pkt_reset);
+
+FAKE_VALUE_FUNC(uint16_t, tmr_set, uint16_t);
+FAKE_VALUE_FUNC(bool, tmr_expired, uint16_t);
 
 FAKE_VALUE_FUNC(uint32_t, cfg_uid);
 FAKE_VALUE_FUNC(uint8_t, cfg_board_type);

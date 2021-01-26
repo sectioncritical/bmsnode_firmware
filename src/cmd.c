@@ -35,6 +35,7 @@
 #include "cfg.h"
 #include "adc.h"
 #include "ver.h"
+#include "tmr.h"
 #include "shunt.h"
 #include "testmode.h"
 
@@ -51,6 +52,10 @@ typedef union
     uint32_t u32;
     uint8_t u8[4];
 } u32buf_t;
+
+// timeout for waiting for a packet
+static uint16_t pkt_timeout;
+static bool pkt_waiting = false;
 
 #ifndef UNIT_TEST // cant call through null function pointer during unit test
 static void(*swreset)(void) = 0;
@@ -257,6 +262,9 @@ packet_t *cmd_process(void)
     {
         bool ret = false;
 
+        // we got a packet, so clear the waiting flag
+        pkt_waiting = false;
+
         // save indicator of any DFU command, for any node
         // this is used by app main loop
         // if command is DFU to any node, we want to return command to
@@ -358,5 +366,30 @@ packet_t *cmd_process(void)
     }
 
     // getting here means no valid packet is available
+
+    // check if we are waiting on the packet to complete
+    if (pkt_waiting)
+    {
+        // timed out waiting for a packet to complete
+        if (tmr_expired(pkt_timeout))
+        {
+            // something must have gone wrong
+            // reset the packet processor
+            pkt_reset();
+            pkt_waiting = false;
+        }
+    }
+    // else we are not waiting yet, check to see if we need to start timeout
+    else
+    {
+        // some packet processing is already going on
+        if (pkt_is_active())
+        {
+            // set a timeout to make sure packet processor doesnt get stuck
+            pkt_timeout = tmr_set(5000);    // 5 seconds to complete packet
+            pkt_waiting = true;
+        }
+    }
+    // either way, there is no valid packet so return NULL
     return NULL;
 }
