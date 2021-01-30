@@ -63,8 +63,9 @@ test:
         when: always
         paths:
             - "$TEST_DIR/reports/*.html"
-            - "$TEST_DIR/reports/check-badge.svg"
+            - "$TEST_DIR/reports/*.svg"
             - "$TEST_DIR/reports/check/*.html"
+            - "$TEST_DIR/reports/todo-report.txt"
         reports:
             junit: "$TEST_DIR/reports/bmstest-junit.xml"
 

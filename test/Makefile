@@ -161,8 +161,22 @@ $(REPORTDIR)/check-badge.svg: $(REPORTDIR)/check.xml venv
 check:
 	cppcheck --std=c99 --platform=avr8 --enable=all -UUNIT_TEST --suppress=missingIncludeSystem --inline-suppr -v ../src
 
+todo: $(REPORTDIR)/todo-report.txt
+
+# generate to do report
+$(REPORTDIR)/todo-report.txt: | $(REPORTDIR)
+	TD_COUNT=$$(grep -o "TODO" ../src/*.c ../src/*.h | wc -l | tr -d [:blank:]); \
+	echo "TODO count: $$TD_COUNT" > $@; echo "" >> $@; \
+	grep -n --context=4 TODO ../src/*.c ../src/*.h >> $@; \
+	venv/bin/anybadge -l todo -v $$TD_COUNT -u -o -f $(REPORTDIR)/todo-badge.svg 1=green 6=yellow 10=brightred
+
+# generate memory usage badges
+.PHONY: checksize
+checksize: venv $(REPORTDIR)
+	./checksize.sh
+
 .PHONY: report
-report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg checkunit
+report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg $(REPORTDIR)/todo-report.txt checkunit checksize
 
 .PHONY: runtest
 runtest: $(TESTBINS)
