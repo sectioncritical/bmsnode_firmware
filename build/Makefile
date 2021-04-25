@@ -59,6 +59,12 @@ LOAD_PORT?=/dev/cu.usbserial-A107LYRO
 AVRDUDE?=$(shell command -v avrdude)
 AVRDUDE_CONF?= +avrdude/t841.conf
 
+# Atmel device pack location
+PACK_ROOT?=/opt/avr/ATtiny_DFP
+
+# application start address (to allow for 0-base bootloader)
+APP_ADDRESS?=0x200
+
 # bmsnode device address, for operations that need it
 # you almost certainly will need to override this on command line
 ADDR?=254
@@ -179,15 +185,15 @@ CC=avr-gcc
 OBJCOPY=avr-objcopy
 SIZE=avr-size
 
-CFLAGS=-std=c99 -Os -Werror -Wall -ffunction-sections -fdata-sections -fshort-enums -flto -mmcu=attiny841
-LDFLAGS=-Wl,-Map,$(OUT)/$(PROGNAME).map -Wl,--gc-sections -fuse-linker-plugin
+CFLAGS=-std=c99 -Os -Werror -Wall -ffunction-sections -fdata-sections -fshort-enums -flto -mmcu=attiny1614 -I $(PACK_ROOT)/include -B $(PACK_ROOT)/gcc/dev/attiny1614
+LDFLAGS=-Wl,-Map,$(OUT)/$(PROGNAME).map -Wl,--gc-sections -Wl,--section-start=.text=$(APP_ADDRESS) -fuse-linker-plugin
 
 $(OUT):
 	mkdir -p $(OUT)
 
 $(OUT)/%.o: $(SRC)/%.c $(BUILD_DIR)/next-version | $(OUT)
 	$(eval VERSTR=$(shell cat $(BUILD_DIR)/next-version | tr '.' ','))
-	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -DBAUD=$(BAUD) -o $@  -c $<
+	$(CC) $(CFLAGS) -DFWVERSION="{$(VERSTR)}" -DBAUDRATE=$(BAUD) -o $@  -c $<
 
 $(ELFFILE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBFLAGS)

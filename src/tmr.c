@@ -40,8 +40,9 @@ static struct list_node tmrlist;
 static volatile uint16_t systick = 0;
 
 // timer 0 interrupt handler
-ISR(TIMER0_COMPA_vect)
+ISR(TCB0_INT_vect)
 {
+    TCB0.INTFLAGS = TCB_CAPT_bm;
     ++systick;
 }
 
@@ -59,14 +60,13 @@ static uint16_t tmr_get_ticks(void)
 // initialize the hardware timer for generating system ticks
 void tmr_init(void)
 {
-    // 1 ms timer tick using timer 0
-    // 8mhz w /64 prescaler = 125000 hz
-    // 125000 Hz /125 ==> 1 khz --> 1 ms
-    // timer 0 in CTC mode, count up, OCR0A=124, OCF0A interrupt
-    TCCR0A = _BV(WGM01); // CTC mode
-    TCCR0B = _BV(CS01) | _BV(CS00); // prescaler /64
-    OCR0A = 124;
-    TIMSK0 = _BV(OCIE0A);
+    // 1 ms timer tick using TCB0 in periodic interrupt mode
+    // 10 MHz / 10000 ==> 1 kHz --> 1ms
+    // TBC0 from reset is already in periodic interrupt mode
+    // Just need to set compare value, enable timer and interrupt
+    TCB0.CCMP = 10000;
+    TCB0.INTCTRL = TCB_CAPT_bm;
+    TCB0.CTRLA = TCB_ENABLE_bm;
     // timer should be running and generating 1 ms interrupts
     // global interrupts are enabled by main app
 

@@ -51,8 +51,8 @@ typedef struct __attribute__ ((__packed__))
 #define CFG_ADDR ((void *)0)
 
 // where the board data is stored in EEPROM
-#define CFG_ADDR_UID ((void *)(0x200-4))
-#define CFG_ADDR_BOARD_TYPE ((void *)(0x200-5))
+#define CFG_ADDR_UID (0x1301)
+#define CFG_ADDR_BOARD_TYPE (0x1300)
 
 // global system configuration is kept here
 config_t g_cfg_parms;
@@ -82,13 +82,13 @@ static uint8_t cfg_compute_crc(config_t *cfg)
 // retrieve and return the board unique ID
 uint32_t cfg_uid(void)
 {
-    return eeprom_read_dword(CFG_ADDR_UID);
+    return *(uint32_t *)(CFG_ADDR_UID);
 }
 
 // retrieve and return the board type
 uint8_t cfg_board_type(void)
 {
-    return eeprom_read_byte(CFG_ADDR_BOARD_TYPE);
+    return *(uint8_t *)(CFG_ADDR_BOARD_TYPE);
 }
 
 // read configuration from eeprom and validate it

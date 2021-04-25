@@ -32,9 +32,11 @@
 #include "cfg.h"
 #include "shunt.h"
 
+#if 0
 // convenience macros to turn it off and on
-#define TURNOFF (PORTA &= ~_BV(PORTA3))
-#define TURNON (PORTA |= _BV(PORTA3))
+#define TURNOFF (TCA0.SINGLE.CTRLC = 0)
+#define TURNON (TCA0.SINGLE.CTRLC = PIN3_bm)
+#endif
 
 // shunt loop adjustment time
 #define SHUNT_LOOP_TIME     100
@@ -51,6 +53,8 @@ static uint8_t pwm = 0; // pwm setting (out of 256)
 // See header file for public function API descriptions.
 //
 //////////
+
+#if 0 // not needed for `1614 which can have PWM of 0
 
 // enable or disable PWM control of GPIO pin
 // when PWM is enabled for pin, it always has at least a 1 count pulse width
@@ -70,22 +74,26 @@ static void shunt_pin_enable(bool enable)
         TOCPMCOE = 0;
     }
 }
+#endif
 
 // set up PWM output for shunting
 void shunt_start(void)
 {
-    // set up timer 1 output pin
-    // shunt pin is TOCC2, use OC1B ==> 01
-    TOCPMSA0 = _BV(TOCC2S0);
-    // enable timer control of pin
-    // pin is enabled for PWM by shunt_pin_enable()
-    //TOCPMCOE = _BV(TOCC2OE);
+    // Set CMP to 0 first so it stays off
+    TCA0.SINGLE.CMP1 = 0;
 
-    // set timer 1 compare output mode for fast PWM
-    // clear on OC1B match waveform 8-bit mode
-    // clock select prescaler /8 ==> gives about 4 kHz
-    TCCR1A = _BV(COM1B1) | _BV(WGM10);
-    TCCR1B = _BV(WGM12) | _BV(CS11) | _BV(CS10);
+    // Set output pin to low (while timer is disable) - safing
+    TCA0.SINGLE.CTRLC = 0; // all off
+
+    // setup mode and enable waveform control of pin
+    TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP1EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc;
+
+    // set up period for PWM freq
+    // 10 MHz / 8 / 256 ==> ~4.8 kHz
+    TCA0.SINGLE.PER = 256;
+
+    // finally, enable the timer
+    TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV8_gc | TCA_SINGLE_ENABLE_bm;
 
     // set initial PWM to 0
     shunt_set(0);
@@ -109,11 +117,11 @@ void shunt_stop(void)
     // set PWM to 0 (just in case)
     shunt_set(0);
 
-    // set port output bit low (before disabling timer control of pin)
-    TURNOFF;
+    // disable the timer (timer retains control of pin)
+    TCA0.SINGLE.CTRLA = 0;
 
-    // disable timer control of pin
-    TOCPMCOE = 0;
+    // force pin to low
+    TCA0.SINGLE.CTRLC = 0;
 
     shunt_status = SHUNT_OFF;
 }
@@ -122,9 +130,8 @@ void shunt_stop(void)
 void shunt_set(uint8_t newpwm)
 {
     pwm = newpwm;
-    OCR1BH = 0;
-    OCR1BL = pwm;
-    shunt_pin_enable(pwm != 0);
+    TCA0.SINGLE.CMP1 = pwm;
+    //shunt_pin_enable(pwm != 0);
 }
 
 // get the status
