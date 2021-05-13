@@ -27,6 +27,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <avr/io.h>
+
 #include "catch.hpp"
 #include "pkt.h"
 #include "cmd.h"
@@ -67,7 +69,6 @@ FAKE_VALUE_FUNC(int16_t, adc_get_tempC);
 
 FAKE_VALUE_FUNC(uint8_t, shunt_get_status);
 FAKE_VALUE_FUNC(uint8_t, shunt_get_pwm);
-FAKE_VOID_FUNC(swreset);
 
 FAKE_VOID_FUNC(testmode_off);
 FAKE_VOID_FUNC(testmode_on, testmode_status_t, uint8_t, uint8_t);
@@ -680,7 +681,7 @@ TEST_CASE("DFU command")
     RESET_FAKE(pkt_send);
     RESET_FAKE(pkt_rx_free);
 
-    RESET_FAKE(swreset);
+    RSTCTRL.SWRR = 0;   // software reset register
 
     // reset the payload capture from pkt_send
     memset(pkt_send_payload, 0, 64);
@@ -702,7 +703,7 @@ TEST_CASE("DFU command")
         CHECK_FALSE(ret); // DFU command returns false no matter what
 
         // should have called swreset()
-        CHECK(swreset_fake.call_count == 1);
+        CHECK(RSTCTRL.SWRR == 1);
 
         // TODO: check all the register?? probably not necessary
     }

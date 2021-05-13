@@ -163,6 +163,7 @@ void ser_flush(void)
         headp = 0;
         tailp = 0;
     }
+    // CRITICAL_RX() has the side effect of leaving the RX interrupt enabled
 }
 
 // serial RX interrupt handler

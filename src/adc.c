@@ -27,6 +27,7 @@
 
 #include <avr/io.h>
 
+#include "iomap.h"
 #include "thermistor_table.h"
 #include "cfg.h"
 #include "tmr.h"
@@ -78,7 +79,7 @@ void adc_powerup(void)
     PORTB.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;
 
     // turn on external reference and init the ADC
-    PORTB.OUTSET = _BV(3);  // ext ref turned on
+    REFON_PORT.OUTSET = REFON_PIN;  // ext ref turned on
     ADC0.CTRLC = ADC_REFSEL_VREFA_gc | ADC_PRESC_DIV16_gc; // ext ref and /16
     ADC0.CTRLD = ADC_INITDLY_DLY16_gc;  // initialization delay 16 cycles
     ADC0.CTRLA = 1; // enable ADC
@@ -92,7 +93,7 @@ void adc_powerdown(void)
 {
     // shut down the ADC and turn off the external reference
     ADC0.CTRLA = 0;
-    PORTB.OUTCLR = _BV(3);
+    REFON_PORT.OUTCLR = REFON_PIN;
 }
 
 // exponential smoothing of the ADC reading

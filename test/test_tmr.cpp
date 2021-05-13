@@ -31,15 +31,19 @@
 #include "tmr.h"
 
 extern volatile uint16_t *p_systick;
-extern "C" void TIMER0_COMPA_vect(void);
+extern "C" void TCB0_INT_vect(void);
 
 TEST_CASE("tmr init")
 {
+    // this is not a very meaningful test because it is just verifying
+    // the direct writes to registers from the init function. It is not
+    // really testing any logic
+    TCB0.INTCTRL = 0;
+    TCB0.CTRLA = 0;
     tmr_init();
-    CHECK(TCCR0A == 0x02);
-    CHECK(TCCR0B == 0x03);
-    CHECK(OCR0A == 124);
-    CHECK(TIMSK0 == 0x02);
+    CHECK(TCB0.CCMP == 10000);
+    CHECK(TCB0.INTCTRL == 1);
+    CHECK(TCB0.CTRLA == 1);
 }
 
 TEST_CASE("isr advance")
@@ -47,7 +51,7 @@ TEST_CASE("isr advance")
     *p_systick = 0;
     for (int idx = 0; idx < 10; ++idx)
     {
-        TIMER0_COMPA_vect();
+        TCB0_INT_vect();
     }
     CHECK(*p_systick == 10);
 }

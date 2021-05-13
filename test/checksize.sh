@@ -12,17 +12,19 @@ bss=$(echo $sizes |  cut -d ' ' -f 3)
 flash=$(($text + $data))
 ram=$(($data + $bss))
 
-flash_free=$((7552 - $flash))
-ram_free=$((512 - $ram))
+# '1614 has 16k flash and we reserve 512 for boot loader
+# '1614 has 2k ram
+flash_free=$((15872 - $flash))
+ram_free=$((2048 - $ram))
 
-flash_pct=$(($flash_free * 100 / 7552))
-ram_pct=$(($ram_free * 100 / 512))
+flash_pct=$(($flash_free * 100 / 15872))
+ram_pct=$(($ram_free * 100 / 2048))
 
 printf "\n"
-printf "|Memory | Used  | Free  | %% Free|\n"
-printf "|-------|-------|-------|-------|\n"
-printf "| Flash | %4d  | %4d  |  %3d  |\n" $flash $flash_free $flash_pct
-printf "| RAM   | %4d  | %4d  |  %3d  |\n" $ram $ram_free $ram_pct
+printf "|Memory | Used  |  Free  | %% Free|\n"
+printf "|-------|-------|--------|-------|\n"
+printf "| Flash | %4d  | %5d  |  %3d  |\n" $flash $flash_free $flash_pct
+printf "| RAM   | %4d  | %5d  |  %3d  |\n" $ram $ram_free $ram_pct
 printf "\n"
 
 mkdir -p $REPORTS
