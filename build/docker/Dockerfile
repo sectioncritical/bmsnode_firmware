@@ -1,48 +1,61 @@
-FROM debian:buster-slim
-WORKDIR /mount
+# Notes about base image
+#
+# We need to use bullseye because we need the versions of
+# doxygen, gcc-avr, and cppcheck that are included. If we use buster, then
+# those utilities do not propertly support the ATtiny1614.
+# They can be built separately as done in the past (see git history of this
+# Dockerfile), but it is easier and faster to get the them from the distro
+# repo.
+#
+# About image size:
+#
+# At the time of this writing, the image size is about 800M. A lot of that
+# comes from python packages that are installed. It appears that there are
+# slim python images available, for example 3.9-slim-buster, which are quite
+# a bit smaller. However at this time python docker images are not available
+# based on bullseye so we are back to having out of date AVR build tools.
+# In the future, when there is a python slim image for bullseye, then this
+# Dockerfile can be updated to use that which should result in a significantly
+# smaller image.
+
+FROM debian:bullseye-slim
+WORKDIR /bmsnode
+
+# npm/node stuff was originally here to support documentation tool smcat
+# but that is not used in the build right now so dont need node
 
 # base tools
-RUN apt-get update \
-    && apt-get install -y \
-        gcc \
-        g++ \
-        gcc-avr \
-        avr-libc \
-        make \
-        pkg-config \
-        python3 \
-        python3-pip \
-        python3-venv \
-        python3-wheel \
-        python3-pygments \
-        git \
-        curl \
-        cmake \
-        flex \
-        bison \
-        libpcre3-dev \
-        nodejs \
-        npm \
-    && rm -rf /var/lib/apt/lists/* \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3 10 \
-    && npm install --global state-machine-cat
+RUN apt-get update          \
+    && apt-get install -y   \
+        avr-libc            \
+        cppcheck            \
+        curl                \
+        doxygen             \
+        gcc-avr             \
+        git                 \
+        make                \
+#        nodejs              \
+#        npm                 \
+        pkg-config          \
+        python3             \
+        python3-pip         \
+        python3-venv        \
+        python3-wheel       \
+        python3-pygments    \
+        unzip zip           \
+    && rm -rf /var/lib/apt/lists/*
+#    && rm -rf /var/lib/apt/lists/* \
+#    && update-alternatives --install /usr/bin/python python /usr/bin/python3 10 \
+#    && npm install --global state-machine-cat
 
-# build cppcheck
-RUN git clone -b 2.2 --depth=1 https://github.com/danmar/cppcheck.git \
-    && cd cppcheck \
-    && make MATCHCOMPILER=yes FILESDIR=/usr/share/cppcheck HAVE_RULES=yes CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function" install \
-    && cd .. && rm -rf cppcheck
 
-# build doxygen from sources
-RUN curl -L -o doxygen-1.9.1.src.tar.gz https://doxygen.nl/files/doxygen-1.9.1.src.tar.gz \
-    && tar -zxf doxygen-1.9.1.src.tar.gz \
-    && cd doxygen-1.9.1 \
-    && mkdir -v build \
-    && cd build \
-    && cmake -G "Unix Makefiles" \
-        -D CMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -Wno-dev .. \
-    && make \
-    && make install \
-    && cd ../.. && rm -rf doxygen-1.9.1 && rm -f doxygen-1.9.1.src.tar.gz
+# we only need the include and gcc directories from the atpack
+
+RUN mkdir -p /opt/avr \
+    && curl -L -o /root/attiny.atpack \
+       https://packs.download.microchip.com/Microchip.ATtiny_DFP.2.6.122.atpack \
+    && unzip /root/attiny.atpack "include/*" "gcc/*" -d /opt/avr/ATtiny_DFP.2.6.122 \
+    && ln -s /opt/avr/ATtiny_DFP.2.6.122 /opt/avr/ATtiny_DFP \
+    && rm -f /root/attiny.atpack
 
 CMD ["/bin/bash"]

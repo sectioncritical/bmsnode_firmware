@@ -14,7 +14,7 @@ help:
 
 .PHONY: build
 build:
-	docker build -t registry.gitlab.com/kroesche/bmsnode .
+	docker build --progress=plain -t registry.gitlab.com/kroesche/bmsnode .
 
 .PHONY: login
 login:
@@ -34,4 +34,4 @@ images:
 
 .PHONY: run
 run:
-	cd ../..; docker run -it -v $$(pwd):/mount registry.gitlab.com/kroesche/bmsnode /bin/bash
+	cd ../..; docker run -it -v $$(pwd):/bmsnode registry.gitlab.com/kroesche/bmsnode /bin/bash
