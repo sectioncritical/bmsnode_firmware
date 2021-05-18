@@ -27,26 +27,27 @@
 
 #include <avr/io.h>
 
+#include "iomap.h"
 #include "tmr.h"
 #include "adc.h"
 #include "shunt.h"
 #include "testmode.h"
 
 // convenience macros for controlling IO pins
-#define VREF_ON     (PORTA |= _BV(PORTA0))
-#define VREF_OFF    (PORTA &= ~_BV(PORTA0))
+#define VREF_ON     (REFON_PORT.OUTSET = REFON_PIN)
+#define VREF_OFF    (REFON_PORT.OUTCLR = REFON_PIN)
 
-#define IO_ON       (PORTB |= _BV(PORTB1))
-#define IO_OFF      (PORTB &= ~_BV(PORTB1))
+#define IO_ON       (EXTIO_PORT.OUTSET = EXTIO_PIN)
+#define IO_OFF      (EXTIO_PORT.OUTCLR = EXTIO_PIN)
 
-#define SHUNT_ON    (PORTA |= _BV(PORTA3))
-#define SHUNT_OFF   (PORTA &= ~_BV(PORTA3))
+#define SHUNT_ON    (TCA0.SINGLE.CTRLC |= TCA_SINGLE_CMP1OV_bm)
+#define SHUNT_OFF   (TCA0.SINGLE.CTRLC &= ~TCA_SINGLE_CMP1OV_bm)
 
-#define GREEN_ON    (PORTA |= _BV(PORTA6))
-#define GREEN_OFF   (PORTA &= ~_BV(PORTA6))
+#define GREEN_ON    (GREEN_PORT.OUTSET = GREEN_PIN)
+#define GREEN_OFF   (GREEN_PORT.OUTCLR = GREEN_PIN)
 
-#define BLUE_ON     (PORTA |= _BV(PORTA5))
-#define BLUE_OFF    (PORTA &= ~_BV(PORTA5))
+#define BLUE_ON     (BLUE_PORT.OUTSET = BLUE_PIN)
+#define BLUE_OFF    (BLUE_PORT.OUTCLR = BLUE_PIN)
 
 static uint16_t test_seconds;   // testmode seconds counter (for timing out)
 static uint16_t test_timeout;   // 1 second tick timeout

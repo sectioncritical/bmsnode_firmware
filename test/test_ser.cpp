@@ -56,8 +56,8 @@ extern "C" {
 FAKE_VOID_FUNC(pkt_parser, uint8_t);
 
 // serial module interrupt functions to be called
-void USART0_RX_vect(void);
-void USART0_UDRE_vect(void);
+void USART0_RXC_vect(void);
+void USART0_DRE_vect(void);
 
 // board type global variable
 uint8_t g_board_type = BOARD_TYPE_NONE;
@@ -69,103 +69,59 @@ TEST_CASE("RX ISR")
     *serial_internals.pheadp = 0;
     *serial_internals.ptailp = 0;
     memset(serial_internals.ptxbuf, 0, serial_internals.bufsize);
-    UCSR0A = 0;
-    UCSR0B = 0;
-    UDR0 = 0;
+    USART0.STATUS = 0;
+    USART0.RXDATAL = 0;
     g_board_type = BOARD_TYPE_BMSNODE;
 
     SECTION("isr with no data")
     {
-        UCSR0A = 0; // no data available
-        UDR0 = 0x55; // data value - should not get passed
-        USART0_RX_vect(); // call ISR
+        USART0.STATUS = 0; // no data available
+        USART0.RXDATAL = 0x55; // data value - should not get passed
+        USART0_RXC_vect(); // call ISR
         CHECK_FALSE(pkt_parser_fake.call_count); // should not be called
-        CHECK_FALSE(UCSR0B);
-    }
-
-    SECTION("isr with byte (old board)")
-    {
-        g_board_type = BOARD_TYPE_STUARTV42;
-        UCSR0A = 0x80; // RXC0 set - data available
-        UDR0 = 0x55;
-        USART0_RX_vect();
-        CHECK(pkt_parser_fake.call_count == 1);
-        CHECK(pkt_parser_fake.arg0_val == 0x55);
-        CHECK(*serial_internals.pheadp == 1);
-        CHECK(*serial_internals.ptailp == 0);
-        CHECK(serial_internals.ptxbuf[0] == 0x55);
-        CHECK(serial_internals.ptxbuf[1] == 0);
-        CHECK(UCSR0B == 0x60); // ISR enabled TX interrupts
     }
 
     SECTION("isr with byte")
     {
-        UCSR0A = 0x80; // RXC0 set - data available
-        UDR0 = 0x55;
-        USART0_RX_vect();
+        USART0.STATUS = 0x80; // RXCIF set - data available
+        USART0.RXDATAL = 0x55;
+        USART0_RXC_vect();
         CHECK(pkt_parser_fake.call_count == 1);
         CHECK(pkt_parser_fake.arg0_val == 0x55);
         CHECK(*serial_internals.pheadp == 0); // new board ISR does not stuff
         CHECK(*serial_internals.ptailp == 0); // anything into TX buffer
         CHECK(serial_internals.ptxbuf[0] == 0);
         CHECK(serial_internals.ptxbuf[1] == 0);
-        CHECK(UCSR0B == 0); // new board RX ISR does not touch TX interrupts
     }
 
     SECTION("isr and txbuf full")
     {
         // set headp to last position which makes buffer full
         *serial_internals.pheadp = serial_internals.bufsize - 1;
-        UCSR0A = 0x80; // RXC0 set - data available
-        UDR0 = 0x55;
-        USART0_RX_vect();
+        USART0.STATUS = 0x80; // RXCIF set - data available
+        USART0.RXDATAL = 0x55;
+        USART0_RXC_vect();
         CHECK(pkt_parser_fake.call_count == 1);
         CHECK(pkt_parser_fake.arg0_val == 0x55);
         CHECK(*serial_internals.pheadp == (serial_internals.bufsize - 1));
         CHECK(*serial_internals.ptailp == 0);
         CHECK(serial_internals.ptxbuf[0] == 0);
         CHECK(serial_internals.ptxbuf[1] == 0);
-        CHECK_FALSE(UCSR0B);
     }
 
     SECTION("isr and txbuf full variant")
     {
         // set tailp to 1, with headp=0 means buffer is full
         *serial_internals.ptailp = 1;
-        UCSR0A = 0x80; // RXC0 set - data available
-        UDR0 = 0x55;
-        USART0_RX_vect();
+        USART0.STATUS = 0x80; // RXCIF set - data available
+        USART0.RXDATAL = 0x55;
+        USART0_RXC_vect();
         CHECK(pkt_parser_fake.call_count == 1);
         CHECK(pkt_parser_fake.arg0_val == 0x55);
         CHECK(*serial_internals.pheadp == 0);
         CHECK(*serial_internals.ptailp == 1);
         CHECK(serial_internals.ptxbuf[0] == 0);
         CHECK(serial_internals.ptxbuf[1] == 0);
-        CHECK_FALSE(UCSR0B);
-    }
-
-    SECTION("isr with txbuf rollover (old board)")
-    {
-        g_board_type = BOARD_TYPE_STUARTV42;
-        // set tailp to 1 and headp to end in preparation to rollover
-        *serial_internals.ptailp = 1;
-        *serial_internals.pheadp = serial_internals.bufsize - 1;;
-        UCSR0A = 0x80; // RXC0 set - data available
-        UDR0 = 0x55;
-        USART0_RX_vect();
-        CHECK(pkt_parser_fake.call_count == 1);
-        CHECK(pkt_parser_fake.arg0_val == 0x55);
-        CHECK(*serial_internals.pheadp == 0);
-        CHECK(*serial_internals.ptailp == 1);
-        CHECK(serial_internals.ptxbuf[0] == 0);
-        CHECK(serial_internals.ptxbuf[1] == 0);
-        CHECK(serial_internals.ptxbuf[serial_internals.bufsize - 1] == 0x55);
-        CHECK(UCSR0B == 0x60);
-
-        // This test is not needed for new boards because new board does not
-        // stuff anything into TX buffer so overflow will not occur. It was
-        // already established that TX buffer is not used for new board in an
-        // earlier test case.
     }
 }
 
@@ -182,23 +138,11 @@ TEST_CASE("ser_write")
     *serial_internals.pheadp = 0;
     *serial_internals.ptailp = 0;
     memset(serial_internals.ptxbuf, 0, serial_internals.bufsize);
-    UCSR0A = 0;
-    UCSR0B = 0;
-    UDR0 = 0;
+    USART0.STATUS = 0;
+    USART0.RXDATAL = 0;
+    USART0.CTRLA = 0;   // interrupts disabled
+    USART0.CTRLB = 0x80; // RX enabled TX disabled
     g_board_type = BOARD_TYPE_BMSNODE;
-
-    SECTION("basic 1 byte (old board)")
-    {
-        g_board_type = BOARD_TYPE_STUARTV42;;
-        int ret = ser_write(wrdata, 1);
-        CHECK(ret == 1);
-        CHECK(*serial_internals.pheadp == 1);
-        CHECK(*serial_internals.ptailp == 0);
-        CHECK(serial_internals.ptxbuf[0] == 34);
-        CHECK(serial_internals.ptxbuf[1] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        CHECK(UCSR0B == 0xE0);
-    }
 
     SECTION("basic 1 byte")
     {
@@ -208,25 +152,18 @@ TEST_CASE("ser_write")
         CHECK(*serial_internals.ptailp == 0);
         CHECK(serial_internals.ptxbuf[0] == 34);
         CHECK(serial_internals.ptxbuf[1] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
-    }
-
-    SECTION("some bytes (old board)")
-    {
-        g_board_type = BOARD_TYPE_STUARTV42;;
-        int ret = ser_write(wrdata, 9);
-        CHECK(ret == 9);
-        CHECK(*serial_internals.pheadp == 9);
-        CHECK(*serial_internals.ptailp == 0);
-        CHECK(serial_internals.ptxbuf[0] == 34);
-        CHECK(serial_internals.ptxbuf[1] == 33);
-        CHECK(serial_internals.ptxbuf[8] == 26);
-        CHECK(serial_internals.ptxbuf[9] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        CHECK(UCSR0B == 0xE0);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        // NOTE: RX int is actually enabled because of the way the
+        // CRITICAL_RX macro works (in the embedded code)
+        // The RX interrupt will be left enabled after the ser_write fn
+        // TODO: review this and make sure this is the way the embedded
+        // code should work
+        CHECK(USART0.CTRLA == 0xE0);
+        CHECK(USART0.CTRLB == 0x40);
+        //INFO("Review RX int handling in CRITICAL_RX");
+        //CHECK(false);
     }
 
     SECTION("some bytes")
@@ -239,16 +176,12 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[1] == 33);
         CHECK(serial_internals.ptxbuf[8] == 26);
         CHECK(serial_internals.ptxbuf[9] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
-
-    // for the remaining tests, I am not testing both old board and new
-    // board. I believe with regard to the old board, the point is made
-    // with the above two tests. The remaining tests just assume new board.
-    // Old board is deprecated.
 
     SECTION("max bytes")
     {
@@ -261,10 +194,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[8] == 26);
         CHECK(serial_internals.ptxbuf[30] == 4);
         CHECK(serial_internals.ptxbuf[31] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
 
     SECTION("over max bytes")
@@ -278,10 +212,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[8] == 26);
         CHECK(serial_internals.ptxbuf[30] == 4);
         CHECK(serial_internals.ptxbuf[31] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
 
     SECTION("full then add more")
@@ -297,10 +232,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[8] == 26);
         CHECK(serial_internals.ptxbuf[30] == 4);
         CHECK(serial_internals.ptxbuf[31] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
 
     SECTION("rollover")
@@ -314,10 +250,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[1] == 33);
         CHECK(serial_internals.ptxbuf[19] == 15);
         CHECK(serial_internals.ptxbuf[20] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
 
         // adjust tail pointer to "remove" some data from buffer
         *serial_internals.ptailp = 18;
@@ -330,10 +267,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[0] == 22);
         CHECK(serial_internals.ptxbuf[1] == 21);
         CHECK(serial_internals.ptxbuf[7] == 15);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
 
     SECTION("full check tailp in middle")
@@ -349,10 +287,11 @@ TEST_CASE("ser_write")
         CHECK(serial_internals.ptxbuf[2] == 32);
         CHECK(serial_internals.ptxbuf[3] == 31);
         CHECK(serial_internals.ptxbuf[4] == 0);
-        // UDRIE and RXCIE both set because crit section turns RXCIE back on
-        // TXCIE is set because that is how new board works now
         // ser_write explicitly enabled TX and disables RX
-        CHECK(UCSR0B == 0xE8);
+        // TXCIE and DREIE should both be enabled
+        // RX should be disabled and TX enabled
+        CHECK(USART0.CTRLA == 0xE0); // see notes above
+        CHECK(USART0.CTRLB == 0x40);
     }
 }
 
@@ -360,11 +299,12 @@ TEST_CASE("ser_flush")
 {
     *serial_internals.pheadp = 10;
     *serial_internals.ptailp = 20;
-    UCSR0B = 0x20;
+    // TX interrupts are enabled, RX int disabled
+    USART0.CTRLA = 0x60;
     ser_flush();
     CHECK_FALSE(*serial_internals.pheadp);
     CHECK_FALSE(*serial_internals.ptailp);
-    CHECK(UCSR0B == 0x80); // RX int got turned on as expected
+    CHECK(USART0.CTRLA == 0x80); // RX int got turned on as expected, TX off
 }
 
 TEST_CASE("TX isr")
@@ -372,17 +312,21 @@ TEST_CASE("TX isr")
     *serial_internals.pheadp = 0;
     *serial_internals.ptailp = 0;
     memset(serial_internals.ptxbuf, 0, serial_internals.bufsize);
-    UCSR0A = 0;
-    UCSR0B = 0;
-    UDR0 = 0;
+    USART0.CTRLA = 0x60;    // TXC and DRE interrupts enabled
+    USART0.CTRLB = 0x40;    // TX enabled RX disabled
+    USART0.STATUS = 0;      // nothing pending
+    USART0.RXDATAL = 0;
+    USART0.TXDATAL = 0;
 
     SECTION("empty buffer")
     {
-        UCSR0B = 0x20; // tx int is enabled
-        UDR0 = 99; // dummy value to check later
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 99); // UDR was not changed
-        CHECK_FALSE(UCSR0B); // tx int was disabled
+        // tx int is enabled
+        USART0.TXDATAL = 99;            // dummy value to check later
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 99);    // UDR was not changed
+        uint8_t ctrla = USART0.CTRLA;
+        CHECK_FALSE((ctrla & 0x20));    // tx dre int was disabled
+        CHECK((ctrla & 0x40));          // txc still enabled
     }
 
     SECTION("1 byte then empty")
@@ -392,21 +336,21 @@ TEST_CASE("TX isr")
         CHECK(ret == 1);
 
         // verify isr processes the 1 byte
-        UCSR0B = 0x20; // tx int is enabled
-        UCSR0A = 0x20; // tx int is signalled
-        UDR0 = 99; // dummy value to check later
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 34); // value from buffer
+        // tx int is already nabled
+        USART0.STATUS = 0x20; // tx dre int is signalled
+        USART0.TXDATAL = 99; // dummy value to check later
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 34); // value from buffer
         CHECK(*serial_internals.pheadp == 1);
         CHECK(*serial_internals.ptailp == 1);
-        CHECK(UCSR0B == 0x20); // tx int remains enabled
+        CHECK((USART0.CTRLA & 0x20)); // tx dre int remains enabled
 
         // run isr again and verify it does not process anything
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 34); // unchanged from last
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 34); // unchanged from last
         CHECK(*serial_internals.pheadp == 1); // unchanged
         CHECK(*serial_internals.ptailp == 1);
-        CHECK_FALSE(UCSR0B); // tx int was disabled
+        CHECK_FALSE((USART0.CTRLA & 0x20)); // tx dre int was disabled
     }
 
     SECTION("1 byte but tx int not triggered")
@@ -415,12 +359,12 @@ TEST_CASE("TX isr")
         int ret = ser_write(wrdata, 1);
         CHECK(ret == 1);
 
-        UCSR0B = 0x20; // tx int is enabled
-        UCSR0A = 0; // tx int is NOT signalled
-        UDR0 = 99; // dummy value to check later
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 99); // UDR is unchanged
-        CHECK(UCSR0B == 0x20); // tx int remains enabled
+        // tx int is already enabled
+        // tx dre int is has NOT been signalled
+        USART0.TXDATAL = 99; // dummy value to check later
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 99); // UDR is unchanged
+        CHECK((USART0.CTRLA & 0x20)); // tx dre int remains enabled
     }
 
     SECTION("full buffer")
@@ -432,28 +376,28 @@ TEST_CASE("TX isr")
         CHECK(ret == 31);
 
         // run the isr 31 times and save the produced bytes
-        UCSR0B = 0x20; // tx int is enabled
-        UCSR0A = 0x20; // tx int is signalled
+        // tx dre int is already enabled
+        USART0.STATUS = 0x20; // tx dre int is signalled
         for (int i = 0; i < 31; ++i)
         {
-            UDR0 = 0;
-            USART0_UDRE_vect();
-            if (UDR0 == 0)
+            USART0.TXDATAL = 0;
+            USART0_DRE_vect();
+            if (USART0.TXDATAL == 0)
             {
-                FAIL("exected non-zero UDR0 after tx isr");
+                FAIL("exected non-zero TXDATAL after tx isr");
             }
-            testbuf[i] = UDR0;
+            testbuf[i] = USART0.TXDATAL;
         }
-        CHECK(UCSR0B == 0x20); // tx int remains enabled
+        CHECK((USART0.CTRLA & 0x20)); // tx dre int remains enabled
         CHECK(*serial_internals.pheadp == 31);
         CHECK(*serial_internals.ptailp == 31);
         CHECK(memcmp(wrdata, testbuf, 31) == 0);
 
-        // run it one more time and verify UDR not written and int disabled
-        UDR0 = 99;
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 99);
-        CHECK_FALSE(UCSR0B); // tx int was disabled
+        // run it one more time and verify TXDATAL not written and int disabled
+        USART0.TXDATAL = 99;
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 99);
+        CHECK_FALSE((USART0.CTRLA & 0x20)); // tx dre int was disabled
         CHECK(*serial_internals.pheadp == 31);
         CHECK(*serial_internals.ptailp == 31);
     }
@@ -470,35 +414,35 @@ TEST_CASE("TX isr")
         CHECK(ret == 20);
 
         // run the isr 20 times and save the produced bytes
-        UCSR0B = 0x20; // tx int is enabled
-        UCSR0A = 0x20; // tx int is signalled
+        // tx dre int is already enabled
+        USART0.STATUS = 0x20; // tx dre int is signalled
         for (int i = 0; i < 20; ++i)
         {
-            UDR0 = 0;
-            USART0_UDRE_vect();
-            if (UDR0 == 0)
+            USART0.TXDATAL = 0;
+            USART0_DRE_vect();
+            if (USART0.TXDATAL == 0)
             {
-                FAIL("exected non-zero UDR0 after tx isr");
+                FAIL("exected non-zero TXDATAL after tx isr");
             }
-            testbuf[i] = UDR0;
+            testbuf[i] = USART0.TXDATAL;
         }
-        CHECK(UCSR0B == 0x20); // tx int remains enabled
+        CHECK((USART0.CTRLA & 0x20)); // tx dre int remains enabled
         CHECK(*serial_internals.pheadp == 13);
         CHECK(*serial_internals.ptailp == 13);
         CHECK(memcmp(wrdata, testbuf, 20) == 0);
 
         // run it one more time and verify UDR not written and int disabled
-        UDR0 = 99;
-        USART0_UDRE_vect();
-        CHECK(UDR0 == 99);
-        CHECK_FALSE(UCSR0B); // tx int was disabled
+        USART0.TXDATAL = 99;
+        USART0_DRE_vect();
+        CHECK(USART0.TXDATAL == 99);
+        CHECK_FALSE((USART0.CTRLA & 0x20)); // tx dre int was disabled
         CHECK(*serial_internals.pheadp == 13);
         CHECK(*serial_internals.ptailp == 13);
     }
 }
 
-// UCSR0A - RXC0(0x80) TXC0(0x40) UDRE0(0x20)
-// UCSR0B - RXCIE(0x80) TXCIE(0x40) UDRIE(0x20)
+// STATUS - RXC(0x80) TXC(0x40) DRE(0x20)
+// CTRLA  - RXCIE(0x80) TXCIE(0x40) DREIE(0x20)
 //
 // is_active when:
 // - data in tx buffer
@@ -510,8 +454,8 @@ TEST_CASE("is active")
 {
     *serial_internals.pheadp = 0;
     *serial_internals.ptailp = 0;
-    UCSR0A = 0x60; // TXC and UDRE set in idle state
-    UCSR0B = 0;
+    USART0.STATUS = 0x60; // TXC and UDRE set in idle state
+    USART0.CTRLA = 0;
 
     SECTION("all inactive")
     {
@@ -522,7 +466,7 @@ TEST_CASE("is active")
     SECTION("tx/udre int enabled")
     {
         // set UDRIE0 bit (tx int enabled)
-        UCSR0B = 0x20;
+        USART0.CTRLA = 0x20;
         bool ret = ser_is_active();
         CHECK(ret);
     }
@@ -530,7 +474,7 @@ TEST_CASE("is active")
     SECTION("txc int enabled")
     {
         // set UDRIE0 bit (tx int enabled)
-        UCSR0B = 0x40;
+        USART0.CTRLA = 0x40;
         bool ret = ser_is_active();
         CHECK(ret);
     }
@@ -546,7 +490,7 @@ TEST_CASE("is active")
     SECTION("rx not empty")
     {
         // set rx data available flag
-        UCSR0A |= 0x80;
+        USART0.STATUS |= 0x80;
         bool ret = ser_is_active();
         CHECK(ret);
     }

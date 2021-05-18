@@ -176,7 +176,7 @@ checksize: venv $(REPORTDIR)
 	./checksize.sh
 
 .PHONY: report
-report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg $(REPORTDIR)/todo-report.txt checkunit checksize
+report: $(REPORTDIR)/bmstest-junit.html $(REPORTDIR)/bmstest-coverage.html $(REPORTDIR)/check/index.html $(REPORTDIR)/check-badge.svg $(REPORTDIR)/todo-report.txt checksize checkunit
 
 .PHONY: runtest
 runtest: $(TESTBINS)

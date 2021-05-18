@@ -50,28 +50,66 @@ extern "C" {
 //
 
 
+// helpers to check if blue or green LEDs were turned on or off.
+// This tests that the LED was set or cleared. If the LED was already off
+// and not turned off by the test, then this will not detect the current
+// state (ie it is for testing for changes)
+static bool blue_off(void)
+{
+    return (PORTB.OUTCLR == 0x04);
+}
+
+static bool blue_on(void)
+{
+    return (PORTB.OUTSET == 0x04);
+}
+
+static bool green_off(void)
+{
+    return (PORTA.OUTCLR == 0x40);
+}
+
+static bool green_on(void)
+{
+    return (PORTA.OUTSET == 0x40);
+}
+
+static void reset_regs(void)
+{
+    PORTA.OUTSET = 0;
+    PORTB.OUTSET = 0;
+    PORTA.OUTCLR = 0;
+    PORTB.OUTCLR = 0;
+}
+
+static bool any_change(void)
+{
+    uint8_t total = PORTA.OUTSET + PORTB.OUTSET + PORTA.OUTCLR + PORTB.OUTCLR;
+    return (total != 0);
+}
+
 TEST_CASE("simple off on")
 {
     RESET_FAKE(tmr_set);
     RESET_FAKE(tmr_expired);
-    PORTA = 0;
+    reset_regs();
 
     SECTION("blue on off")
     {
         led_on(LED_BLUE);
         led_run();  // should do nothing
-        CHECK(PORTA == 0x20);
+        CHECK(blue_on());
         led_off(LED_BLUE);
         led_run();
-        CHECK(PORTA == 0);
+        CHECK(blue_off());
     }
 
     SECTION("green on off")
     {
         led_on(LED_GREEN);
-        CHECK(PORTA == 0x40);
+        CHECK(green_on());
         led_off(LED_GREEN);
-        CHECK(PORTA == 0);
+        CHECK(green_off());
     }
 }
 
@@ -79,7 +117,7 @@ TEST_CASE("simple off on")
 // LED values change
 void verify_run_no_changes(void)
 {
-    uint8_t saved_porta = PORTA;
+    reset_regs();
     RESET_FAKE(tmr_set);
     RESET_FAKE(tmr_expired);
 
@@ -89,44 +127,55 @@ void verify_run_no_changes(void)
     // expired gets called twice, once for each LED
     CHECK(tmr_expired_fake.call_count == 2);
     CHECK(tmr_set_fake.call_count == 0);
-    CHECK(PORTA == saved_porta);
+    CHECK(PORTA.OUTSET == 0);
+    CHECK(PORTB.OUTSET == 0);
+    CHECK(PORTA.OUTCLR == 0);
+    CHECK(PORTB.OUTCLR == 0);
 
     // expire timers
     tmr_expired_fake.return_val = true;
     led_run();
     CHECK(tmr_expired_fake.call_count == 4);
     CHECK(tmr_set_fake.call_count == 0);
-    CHECK(PORTA == saved_porta);
+    CHECK(PORTA.OUTSET == 0);
+    CHECK(PORTB.OUTSET == 0);
+    CHECK(PORTA.OUTCLR == 0);
+    CHECK(PORTB.OUTCLR == 0);
 
     // run with no timers expired
     tmr_expired_fake.return_val = false;
     led_run();
     CHECK(tmr_expired_fake.call_count == 6);
     CHECK(tmr_set_fake.call_count == 0);
-    CHECK(PORTA == saved_porta);
+    CHECK(PORTA.OUTSET == 0);
+    CHECK(PORTB.OUTSET == 0);
+    CHECK(PORTA.OUTCLR == 0);
+    CHECK(PORTB.OUTCLR == 0);
 
     // expire timers
     tmr_expired_fake.return_val = true;
     led_run();
     CHECK(tmr_expired_fake.call_count == 8);
     CHECK(tmr_set_fake.call_count == 0);
-    CHECK(PORTA == saved_porta);
+    CHECK(PORTA.OUTSET == 0);
+    CHECK(PORTB.OUTSET == 0);
+    CHECK(PORTA.OUTCLR == 0);
+    CHECK(PORTB.OUTCLR == 0);
 }
 
 TEST_CASE("blink 0 params")
 {
     led_off(LED_BLUE);      // reset the internals
     led_off(LED_GREEN);
-    PORTA = 0;
+    reset_regs();
     RESET_FAKE(tmr_set);
     RESET_FAKE(tmr_expired);
 
     // calling blink with both parameters 0 should just result in off
     SECTION("blue 0 0")
     {
-        PORTA = 0x20;   // preset it on
         led_blink(LED_BLUE, 0, 0);
-        CHECK(PORTA == 0);      // should be turned off
+        CHECK(blue_off());      // should be turned off
         CHECK(tmr_set_fake.call_count == 0);    // should not have set a timer
         verify_run_no_changes();
     }
@@ -135,9 +184,8 @@ TEST_CASE("blink 0 params")
     // we will not repeat all test for both blue and green
     SECTION("green 0 0")
     {
-        PORTA = 0x40;   // preset it on
         led_blink(LED_GREEN, 0, 0);
-        CHECK(PORTA == 0);      // should be turned off
+        CHECK(green_off());      // should be turned off
         CHECK(tmr_set_fake.call_count == 0);    // should not have set a timer
         verify_run_no_changes();
     }
@@ -145,9 +193,8 @@ TEST_CASE("blink 0 params")
     // calling blink with on parameter 0 should result in off
     SECTION("blue 0 N")
     {
-        PORTA = 0x20;   // preset it on
         led_blink(LED_BLUE, 0, 100);
-        CHECK(PORTA == 0);      // should be turned off
+        CHECK(blue_off());      // should be turned off
         CHECK(tmr_set_fake.call_count == 0);    // should not have set a timer
         verify_run_no_changes();
     }
@@ -156,11 +203,12 @@ TEST_CASE("blink 0 params")
     SECTION("blue N 0")
     {
         led_blink(LED_BLUE, 100, 0);
-        CHECK(PORTA == 0x20);   // should be turned on
+        CHECK(blue_on());   // should be turned on
         CHECK(tmr_set_fake.call_count == 0);    // should not have set a timer
         verify_run_no_changes();
     }
 }
+
 
 TEST_CASE("blink non-z params")
 {
@@ -168,39 +216,43 @@ TEST_CASE("blink non-z params")
     led_off(LED_GREEN);
     RESET_FAKE(tmr_set);
     RESET_FAKE(tmr_expired);
-    PORTA = 0;
+    reset_regs();
 
     SECTION("blue 100 200")
     {
         // real blink call, LED should turn on, should have tmr_set call
         led_blink(LED_BLUE, 100, 200);
-        CHECK(PORTA == 0x20);
+        CHECK(blue_on());
         CHECK(tmr_set_fake.call_count == 1);
         CHECK(tmr_set_fake.arg0_val == 100);
 
         // calling run with no tmr expired should have no change
         tmr_expired_fake.return_val = false;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 2); // called for green and blue
-        CHECK(PORTA == 0x20);   // unchanged
+        CHECK_FALSE(any_change());   // unchanged
 
         // tmr expired, LED should turn off
         tmr_expired_fake.return_val = true;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 4);
-        CHECK(PORTA == 0);
+        CHECK(blue_off());
     
         // once again, no tmr expired, no change
         tmr_expired_fake.return_val = false;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 6);
-        CHECK(PORTA == 0);
+        CHECK_FALSE(any_change());
 
         // another expired, should turn back on
         tmr_expired_fake.return_val = true;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 8);
-        CHECK(PORTA == 0x20);
+        CHECK(blue_on());
 
         // during all this time, tmr_set should not have been called again
         CHECK(tmr_set_fake.call_count == 1);
@@ -213,13 +265,13 @@ TEST_CASE("one shot")
     led_off(LED_GREEN);
     RESET_FAKE(tmr_set);
     RESET_FAKE(tmr_expired);
-    PORTA = 0;
+    reset_regs();
 
     SECTION("called w/0")
     {
-        PORTA = 0x40;   // preset it on, should be turned off
+        // should get turned off
         led_oneshot(LED_GREEN, 0);
-        CHECK(PORTA == 0);
+        CHECK(green_off());
         CHECK(tmr_set_fake.call_count == 0);
         CHECK(tmr_expired_fake.call_count == 0);
         verify_run_no_changes();
@@ -228,33 +280,37 @@ TEST_CASE("one shot")
     SECTION("called w/800")
     {
         led_oneshot(LED_GREEN, 800);
-        CHECK(PORTA == 0x40);   // should be turned on
+        CHECK(green_on());   // should be turned on
         CHECK(tmr_set_fake.call_count == 1);    // should have set timer
         CHECK(tmr_set_fake.arg0_val == 800);
 
         // calling run with no tmr expired should have no change
         tmr_expired_fake.return_val = false;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 2); // called for green and blue
-        CHECK(PORTA == 0x40);   // unchanged
+        CHECK_FALSE(any_change());   // unchanged
 
         // tmr expired, LED should turn off
         tmr_expired_fake.return_val = true;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 4);
-        CHECK(PORTA == 0);
+        CHECK(green_off());
     
         // once again, no tmr expired, no change
         tmr_expired_fake.return_val = false;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 6);
-        CHECK(PORTA == 0);
+        CHECK_FALSE(any_change());
 
         // another expired, should not do anything since it is 1-shot
         tmr_expired_fake.return_val = true;
+        reset_regs();
         led_run();
         CHECK(tmr_expired_fake.call_count == 8);
-        CHECK(PORTA == 0);
+        CHECK_FALSE(any_change());
 
         // during all this time, tmr_set should not have been called again
         CHECK(tmr_set_fake.call_count == 1);

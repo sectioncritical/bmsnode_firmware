@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <avr/io.h>
 
+#include "iomap.h"
 #include "tmr.h"
 #include "led.h"
 
@@ -47,12 +48,13 @@ struct led
     uint16_t toff;          // off duration
     uint16_t tmr;           // tmr timeout value
     enum led_mode mode;     // current mode/state
-    uint8_t mask;           // bit mask on GPIO port (PORTA)
+    PORT_t * pport;         // pointer to port
+    uint8_t mask;           // bit mask on GPIO port
 };
 
 // green and blue LED instances
-static struct led green = { 0, 0, 0, LED_OFF, _BV(PORTA6) };
-static struct led blue = { 0, 0, 0, LED_OFF, _BV(PORTA5) };
+static struct led green = { 0, 0, 0, LED_OFF, &GREEN_PORT, GREEN_PIN };
+static struct led blue = { 0, 0, 0, LED_OFF, &BLUE_PORT, BLUE_PIN };
 
 // lookup LED instances by index
 static struct led * const led_table[] = { &green, &blue };
@@ -63,7 +65,7 @@ void led_on(enum led_index idx)
     // TODO: validate input
     struct led *p_led = led_table[idx];
     p_led->mode = LED_ON;
-    PORTA |= p_led->mask;
+    p_led->pport->OUTSET = p_led->mask;
 }
 
 // turn off LED
@@ -72,7 +74,7 @@ void led_off(enum led_index idx)
     // TODO: validate input
     struct led *p_led = led_table[idx];
     p_led->mode = LED_OFF;
-    PORTA &= ~p_led->mask;
+    p_led->pport->OUTCLR = p_led->mask;
 }
 
 // set LED to blink mode
@@ -97,7 +99,7 @@ void led_blink(enum led_index idx, uint16_t on, uint16_t off)
         p_led->toff = off;
         p_led->mode = LED_BLINK_ON;
         p_led->tmr = tmr_set(on);
-        PORTA |= p_led->mask;
+        p_led->pport->OUTSET = p_led->mask;
     }
 }
 
@@ -130,21 +132,21 @@ static void led_process(enum led_index idx)
         // if currently off, then turn on and update duration for on
         if (p_led->mode == LED_BLINK_OFF)
         {
-            PORTA |= p_led->mask;
+            p_led->pport->OUTSET = p_led->mask;
             p_led->tmr += p_led->ton;
             p_led->mode = LED_BLINK_ON;
         }
         // if it is on, turn off and update duration for off
         else if (p_led->mode == LED_BLINK_ON)
         {
-            PORTA &= ~p_led->mask;
+            p_led->pport->OUTCLR = p_led->mask;
             p_led->tmr += p_led->toff;
             p_led->mode = LED_BLINK_OFF;
         }
         // if 1-shot then just turn it off
         else if (p_led->mode == LED_1SHOT)
         {
-            PORTA &= ~p_led->mask;
+            p_led->pport->OUTCLR = p_led->mask;
             p_led->mode = LED_OFF;
         }
     }

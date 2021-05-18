@@ -27,6 +27,7 @@
 
 #include <avr/io.h>
 
+#include "iomap.h"
 #include "thermistor_table.h"
 #include "cfg.h"
 #include "tmr.h"
@@ -40,7 +41,7 @@
 #define FILTER_WEIGHT 8
 
 // channel map - mux channels to sample
-static const uint8_t channels[4] = { 8, 4, 11, 12 };
+static const uint8_t channels[4] = { 7, 4, 11, 0x1E };
 
 // storage for sample data
 static uint16_t results[4];
@@ -56,18 +57,14 @@ static uint16_t adc_timeout;
 
 // ADC timing notes
 //
-// ADC clock should be 50-200 kHz, per datasheet
-// Given input clock is 8 MHz
-// 8/0.05 = 160
-// 8/0.2 = 40
-// ==> prescaler should be between 40 and 160
-// arbitrarily choose 128 (other choice is 64)
-// ADC CLK ==> 62.5 kHz, cycle time 16 uS
-// longest possible conversion is 26 cycles (typical is 15)
-// conversion time ==> 400 uS max, 240 uS typ
-// total time for 3 conversions is about 1 ms
+// ADC clock should be 50-1500 kHz, per datasheet
+// Given input clock is 10 MHz, choose /16 prescaler
+// 10/16 ==> 625 kHz --> 1.6 uS cycle time
 //
-// bus speed @4800 is about 2 ms per byte, or 1 ms/byte at 9600
+// using initial delay of 16 cycles (only happens on startup)
+// longest possible conversion is 31 cycles (typical is 15)
+// conversion time ==> 50 uS max
+//
 
 // initialize and power up ADC circuits, mainly the external reference
 // this must be called before using adc_samplee(). And it should be 3-4 ms
@@ -77,13 +74,15 @@ void adc_powerup(void)
 {
     // disable digitial inputs for the analog inputs
     // TODO: should this be done at system init?
-    DIDR0 = _BV(ADC4D);
-    DIDR1 = _BV(ADC8D) | _BV(ADC11D);
+    PORTA.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;
+    PORTA.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;
+    PORTB.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;
 
     // turn on external reference and init the ADC
-    PORTA |= _BV(PORTA7);   // ext ref turned on
-    ADCSRA = _BV(ADEN) | 3; // enable ADC and prescaler 128
-    ADMUXB = 0x80;          // use AREF for reference
+    REFON_PORT.OUTSET = REFON_PIN;  // ext ref turned on
+    ADC0.CTRLC = ADC_REFSEL_VREFA_gc | ADC_PRESC_DIV16_gc; // ext ref and /16
+    ADC0.CTRLD = ADC_INITDLY_DLY16_gc;  // initialization delay 16 cycles
+    ADC0.CTRLA = 1; // enable ADC
 
     // reset the ADC timeout
     adc_timeout = tmr_set(3);
@@ -93,8 +92,8 @@ void adc_powerup(void)
 void adc_powerdown(void)
 {
     // shut down the ADC and turn off the external reference
-    ADCSRA = 0;
-    PORTA &= ~_BV(PORTA7);
+    ADC0.CTRLA = 0;
+    REFON_PORT.OUTCLR = REFON_PIN;
 }
 
 // exponential smoothing of the ADC reading
@@ -112,19 +111,22 @@ void adc_sample(void)
     // loop to read all the channels and store results
     for (uint8_t idx = 0; idx < sizeof(channels); ++idx)
     {
-        ADMUXA = channels[idx];    // select channel
-        ADCSRA |= _BV(ADSC);        // start conversion
-        while (ADCSRA & _BV(ADSC))  // wait for conversion complete
+        ADC0.MUXPOS = channels[idx];    // select channel
+        ADC0.COMMAND = 1;               // start conversion
+        while (!(ADC0.INTFLAGS & ADC_RESRDY_bm)) // wait for conversion complete
         {}
 
         // throw away the first result and run the conversion again.
         // this enforces a settling time after the mux change
-        ADCSRA |= _BV(ADSC);
-        while (ADCSRA & _BV(ADSC))
+        // TODO: look into '1614 sample accumulation feature
+        // and 1614 sample delay feature
+        ADC0.INTFLAGS = ADC_RESRDY_bm;  // clear ready flag
+        ADC0.COMMAND = 1;               // start conversion
+        while (!(ADC0.INTFLAGS & ADC_RESRDY_bm)) // wait for conversion complete
         {}
 
-        // save result. read low byte first for atomicity
-        uint16_t result = ADCL | (ADCH << 8);
+        // save result
+        uint16_t result = ADC0.RES;
         results[idx] = adc_filter(result, results[idx]);
     }
 }

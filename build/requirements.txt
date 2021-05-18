@@ -1,3 +1,5 @@
+safety
 intelhex
 pyserial
 -e ../util/bmsutil
+pymcuprog

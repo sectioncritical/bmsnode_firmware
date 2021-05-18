@@ -162,7 +162,7 @@ packet_t *pkt_ready(void)
 }
 
 // assemble a packet and send it
-// this uses and extra buffer to assemble the packet instead of just
+// this uses an extra buffer to assemble the packet instead of just
 // sending bytes one at a time. this ensures that the entire packet
 // gets copied into the serial output buffer without getting corrupted
 // by any incoming data at the time. If there was already incoming data then

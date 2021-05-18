@@ -28,6 +28,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/cpufunc.h>
 #include <util/delay_basic.h>
 
 #include "pkt.h"
@@ -57,12 +58,6 @@ typedef union
 static uint16_t pkt_timeout;
 static bool pkt_waiting = false;
 
-#ifndef UNIT_TEST // cant call through null function pointer during unit test
-static void(*swreset)(void) = 0;
-#else
-extern void swreset(void);
-#endif
-
 // implement command acknowledgement
 // (for commands that just need generic acknowledgement)
 static bool cmd_ack(packet_t *pkt)
@@ -81,31 +76,14 @@ static bool cmd_dfu(void)
     // TODO: should it send a reply? then it will need to wait until
     // message was sent before resetting
 
-    // optiboot expects interrupts to be disabled
-    cli();
+    // for the '841 we had to fake a hardware reset by resetting a bunch of
+    // peripheral registers back to their default states because this was
+    // expected by optiboot.
+    // But for the '1614 it has a software reset command bit so it is much
+    // easier to force a reset, and the hardware will all get reset back to
+    // defaults.
+    ccp_write_io((void *)&(RSTCTRL.SWRR), 1);
 
-    // wait 5 ms to ensure last bytes go out
-    _delay_loop_2(10000); // 10000 ==> 5 ms (8MHz at 4 cycle/loop)
-
-    // restore the power reduction register to its reset value
-    // optiboot uses timer 1
-    PRR = 0;
-
-    // set UART registers to their reset state
-    UCSR0A = 0;
-    UCSR0B = 0;
-    UCSR0C = 0x06;
-    UCSR0D = 0;
-
-    // set timer 0 back to reset state
-    // (BL does not use it, but we want it disabled)
-    TIMSK0 = 0;
-    TCCR0A = 0;
-    TCCR0B = 0;
-
-    // clearing MCUSR tells optiboot that app is starting it
-    MCUSR = 0;
-    swreset();  // jump to boot loader, will not return
     return false;
 }
 

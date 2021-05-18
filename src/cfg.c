@@ -50,9 +50,22 @@ typedef struct __attribute__ ((__packed__))
 // where the configuration block is stored in EEPROM
 #define CFG_ADDR ((void *)0)
 
+#ifdef UNIT_TEST
+
+// cannot access direct addresses in unit test
+// create some memory that can be used to represent the eeprom
+uint32_t fake_uid;
+#define CFG_ADDR_UID &fake_uid
+uint8_t fake_type;
+#define CFG_ADDR_BOARD_TYPE &fake_type
+
+#else // not UNIT_TEST
+
 // where the board data is stored in EEPROM
-#define CFG_ADDR_UID ((void *)(0x200-4))
-#define CFG_ADDR_BOARD_TYPE ((void *)(0x200-5))
+#define CFG_ADDR_UID (0x1301)
+#define CFG_ADDR_BOARD_TYPE (0x1300)
+
+#endif // UNIT_TEST
 
 // global system configuration is kept here
 config_t g_cfg_parms;
@@ -82,13 +95,13 @@ static uint8_t cfg_compute_crc(config_t *cfg)
 // retrieve and return the board unique ID
 uint32_t cfg_uid(void)
 {
-    return eeprom_read_dword(CFG_ADDR_UID);
+    return *(uint32_t *)(CFG_ADDR_UID);
 }
 
 // retrieve and return the board type
 uint8_t cfg_board_type(void)
 {
-    return eeprom_read_byte(CFG_ADDR_BOARD_TYPE);
+    return *(uint8_t *)(CFG_ADDR_BOARD_TYPE);
 }
 
 // read configuration from eeprom and validate it

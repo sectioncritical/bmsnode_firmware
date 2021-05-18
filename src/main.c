@@ -29,13 +29,23 @@
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <avr/sleep.h>
+#include <avr/cpufunc.h>
 
-#define F_CPU 8000000L
-#ifndef BAUD
-#define BAUD 4800
-#endif
-#include <util/setbaud.h>
 #include <util/atomic.h>
+
+#define F_CPU 10000000UL
+#ifndef BAUDRATE
+#define BAUDRATE 9600UL
+#endif
+
+#include <util/delay.h>
+
+// per data sheet, calculation of BAUD rate register (16-bit) follows:
+//
+// BAUDREG = (64 * Fclk) / (16 * Fbaud)
+// (reduces to)
+// BAUDREG = (4 * Fclk) / Fbaud
+#define BAUDREG ((uint16_t)(((float)((F_CPU) * 4UL) / (float)(BAUDRATE)) + 0.5))
 
 #include "cmd.h"
 #include "ser.h"
@@ -47,78 +57,41 @@
 #include "testmode.h"
 #include "led.h"
 #include "kissm.h"
-
-/*
- * Default clocking, per fuses, is 8 MHz internal oscillator with
- * clock divider of 1. So system runs at 8 MHz.
- */
+#include "iomap.h"
 
 /*
  * Pin Assignments
  *
- * "A" mean alt function
- *
- * | Port | Pin | IO | Function                           |
- * |------|-----|----|------------------------------------|
- * |  A0  | 13  | AI | ADC external reference             |
- * |  A1  | 12  | AO | UART0 TX                           |
- * |  A2  | 11  | AI | UART0 RX                           |
- * |  A3  | 10  | AO | GPIO load enable          (TOCC2)  |
- * |  A4  |  9  | AI | ADC4 internal temp sensor (ISP SCK)|
- * |  A5  |  8  | O  | GPIO blue LED (ISP MISO)  (TOCC4)  |
- * |  A6  |  7  | O  | GPIO green LED (ISP MOSI) (TOCC5)  |
- * |  A7  |  6  | O  | GPIO ref enable (needs high drive) |
- * |  B0  |  2  | AI | ADC11 external temp sensor         |
- * |  B1  |  3  | I/O| GPIO spare external                |
- * |  B2  |  5  | AI | ADC8 cell voltage                  |
- * |  B3  |  4  | AI | reset (pulled up)                  |
+ * see iomap.h
  *
  */
 
 void device_init(void)
 {
-    // global not populated yet, so get the board type
-    uint8_t boardtype = cfg_board_type();
-
-    // turn off peripherals we are not using
-    PRR = _BV(PRTWI) | _BV(PRUSART1) | _BV(PRSPI) | _BV(PRTIM2);
-
-    // turn off analog comparators
-    ACSR0A = 0x80;
-    ACSR1A = 0x80;
+    // at reset, MCU is running from 20 MHz oscillator with /6 ==> 3.3 MHz
+    // change the prescaler so it runs at 10 MHz
+    ccp_write_io((void *)&(CLKCTRL.MCLKCTRLB), CLKCTRL_PDIV_2X_gc | CLKCTRL_PEN_bm);
 
     // set up IO
     // this sets up GPIOs. alt functions are set up with peripheral inits
-    PORTA = 0; // set all outputs low, to get known initial state
-    PORTB = 0;
-    PHDE = _BV(PHDEA1); // PA7 drives the reference diode and needs high drive
-    DDRA = _BV(DDA3) | _BV(DDA5) | _BV(DDA6) | _BV(DDA7); // GPIO outputs
-    DDRB = _BV(DDB1);   // PB1 spare is set as output
+    PORTA.OUT = 0; // set all outputs low, to get known initial state
+    PORTB.OUT = 0;
+    PORTA.DIR = PORTADIR;      // from iomap.h
+    PORTB.DIR = PORTBDIR;
+
+    // enable the USART0 alt pin muxing to get to the pins we want to use
+    PORTMUX.CTRLB = PORTMUX_USART0_ALTERNATE_gc;
 
     // set up UART0
-    if (boardtype < BOARD_TYPE_BMSNODE)
-    {
-        // old diyBMS style board types
-        UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0); // enable tx, rx, rx int
-    }
-    else
-    {
-        // bmsnode style boards (shared tx/rx)
-        // enables RX, RX interrupt only. leave TX disabled until needed
-        UCSR0B = _BV(RXEN0) | _BV(RXCIE0);
-
-        // keep TX line as input when not actively transmitting
-        // enable pullup on the pin so that it keeps the shared TX/RX line
-        // pulled high when not being driven low
-        // This is overridden whenever TX is enabled in the ser module for
-        // sending data
-        PUEA = _BV(PORTA1);
-    }
-
-    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); // 8n1
-    UCSR0D = _BV(SFDE0); // start frame detector
-    UBRR0H = UBRRH_VALUE;
-    UBRR0L = UBRRL_VALUE;
+    // bmsnode style boards (shared tx/rx)
+    // set up for one-wire half duplex
+    // enables RX, RX interrupt only. leave TX disabled until needed
+    // not clear we need pullup on TX since there is board pullup
+    // PORTA.PIN1CTRL = PORT_PULLUPEN_bm;  // enable pullup on TX pin
+    USART0.CTRLA = USART_LBME_bm | USART_RXCIE_bm;  // enable loopback and RX int
+    USART0.BAUD = BAUDREG;  // set data rate
+    // UART protocol 8,n,1 is already the default at boot
+    USART0.CTRLB = USART_TXEN_bm | USART_RXEN_bm | USART_ODME_bm | USART_SFDEN_bm; // enable, open-drain
 }
 
 // app event types
@@ -390,26 +363,20 @@ KISSM_DEFSTATE(sleep)
         case KISSM_EVT_ENTRY:
         {
             // turn off watchdog timer
-            MCUSR = 0;
+            RSTCTRL.RSTFR = 0;  // not sure if this is needed for '1614
             wdt_disable();
             adc_powerdown();    // shut down analog circuits
 
             // force LEDs and external outputs off
             led_off(LED_BLUE);
             led_off(LED_GREEN);
-            PORTA &= ~_BV(PORTA3);
-
-            // TODO: this does not turn off external IO, if it was on
-
-            // this is only needed for old boards
-            if (g_board_type < BOARD_TYPE_BMSNODE)
-            {
-                // disable the UART TX (for power saving)
-                UCSR0B &= ~_BV(TXEN0);
-            }
+            EXTIO_PORT.OUTCLR = EXTIO_PIN;
+            LOADON_PORT.OUTCLR = LOADON_PIN;
+            REFON_PORT.OUTCLR = REFON_PIN;
 
             // go to sleep
-            set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+            set_sleep_mode(SLEEP_MODE_STANDBY);
+            //set_sleep_mode(SLEEP_MODE_PWR_DOWN);
             sleep_mode();
 
             // at this point MCU is sleep/pwrdn
@@ -421,12 +388,6 @@ KISSM_DEFSTATE(sleep)
         case KISSM_EVT_EXIT:
         {
             // WAKING UP
-            // this is only needed for old boards
-            if (g_board_type < BOARD_TYPE_BMSNODE)
-            {
-                // re-enable UART TX
-                UCSR0B |= _BV(TXEN0);
-            }
             // turn on blue LED to show we wake up
             led_on(LED_BLUE);
 
@@ -454,19 +415,10 @@ KISSM_DEFSTATE(sleep)
 // system init and main loop
 void main_loop(void)
 {
-    cli();      // should already be disabled, just to be sure
-    MCUSR = 0;  // this has to be done here in order to disable WDT
-    wdt_disable();
+    // interrupts and watchdog should be disabled on entry
 
     device_init();  // hardware init
     cfg_load();     // load node config (global cfg needed for later calls)
-
-    // old board style needs this byte sent at init
-    if (g_board_type < BOARD_TYPE_BMSNODE)
-    {
-        // send out one byte on wake (this causes TXC to get set)
-        UDR0 = 0x55;
-    }
 
     // init the software modules
     tmr_init();

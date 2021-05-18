@@ -47,10 +47,14 @@ static uint8_t txbuf[32];
 #define BUF_NOTFULL() (BUF_CNT() < 31)
 
 // easy enable/disable of TX ISR
-#define TXINT_ENABLE() (UCSR0B |= (_BV(UDRIE0) | _BV(TXCIE0)))
-#define TXINT_DISABLE() (UCSR0B &= ~_BV(UDRIE0))
+#define TXINT_ENABLE() (USART0.CTRLA |= USART_DREIE_bm | USART_TXCIE_bm)
+#define TXINT_DISABLE() (USART0.CTRLA &= ~USART_DREIE_bm)
 // for DISABLE, TXC is disabled separately
 
+// The following comment is no longer true. With half duplex hardware, the
+// received data is no longer copied by firmware to the transmit. Leaving
+// the comment though because it may explain some legacy aspects of the code.
+// DEPRECATED COMMENT
 // the serial transmit buffer is used by app code that wants to send
 // a packet. but it is also used by the RX interrupt to copy any incoming
 // bytes to output. Therefore the TX buffer operations also need to be
@@ -61,17 +65,29 @@ static uint8_t txbuf[32];
 // The rxint enable/disable functions are used with the CRITICAL_RX()
 // macro
 
+// TODO the original duplex switching code was written for the '841 and
+// required enabling and disabling TX and RX at the appropriate times in order
+// to make sure that RX did not receive any of the TX data (thus confusing the
+// parser), and that TX was left enabled long enough to make sure all the bits
+// were shifted out. To port to '1614 I just ported all this behaviour directly
+// from the 841 peripheral to the equivalent registers and bits of the '1614.
+// However, the 1614 has USART support for half duplex (one-wire) and will
+// automatically switch the TX and RX signals as needed. By modifying the
+// parser to reject response packets, then it would not even matter if the
+// RX was copying all the TX bits. So, I think the RX/TX control and logic
+// in this file could be simplified.
+
 // enable receive ISR and return false
 bool rxint_enable(void)
 {
-    UCSR0B |= _BV(RXCIE0);
+    USART0.CTRLA |= USART_RXCIE_bm;
     return false;
 }
 
 // disable receive interrupt and return true
 bool rxint_disable(void)
 {
-    UCSR0B &= ~_BV(RXCIE0);
+    USART0.CTRLA &= ~USART_RXCIE_bm;
     return true;
 }
 
@@ -103,9 +119,9 @@ bool ser_is_active(void)
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
         if (BUF_NOTEMPTY()
-         || (UCSR0B & _BV(UDRIE0))
-         || (UCSR0B & _BV(TXCIE0))
-         || (UCSR0A & _BV(RXC0)))
+         || (USART0.CTRLA & USART_DREIE_bm)
+         || (USART0.CTRLA & USART_TXCIE_bm)
+         || (USART0.STATUS & USART_RXCIF_bm))
         {
             b_isactive = true;
         }
@@ -129,12 +145,9 @@ uint8_t ser_write(uint8_t *buf, uint8_t len)
             txbuf[headp++] = buf[cnt++];
             headp &= 0x1F;
         }
-        // for shared tx/rx boards, switch duplex
-        if (g_board_type >= BOARD_TYPE_BMSNODE)
-        {
-            UCSR0B &= ~_BV(RXEN0);  // disable RX function
-            UCSR0B |= _BV(TXEN0);   // enable TX function
-        }
+        // switch duplex
+        USART0.CTRLB &= ~USART_RXEN_bm; // disable RX function
+        USART0.CTRLB |= USART_TXEN_bm;  // enable TX function
         TXINT_ENABLE(); // will kick off serial transmit
     }
     return cnt;
@@ -146,38 +159,25 @@ void ser_flush(void)
     CRITICAL_RX()
     {
         TXINT_DISABLE();
-        UCSR0B &= ~_BV(TXCIE0);
+        USART0.CTRLA &= ~USART_TXCIE_bm;
         headp = 0;
         tailp = 0;
     }
+    // CRITICAL_RX() has the side effect of leaving the RX interrupt enabled
 }
 
 // serial RX interrupt handler
 // called whenever a received byte is available
-ISR(USART0_RX_vect)
+ISR(USART0_RXC_vect)
 {
     // read uart status
-    uint8_t flags = UCSR0A;
+    uint8_t flags = USART0.STATUS;
 
     // check for rx received
-    if (flags & _BV(RXC0))
+    if (flags & USART_RXCIF_bm)
     {
         // read character from uart
-        uint8_t ch = UDR0;
-
-        // only early hardware needs to do this
-        if (g_board_type < BOARD_TYPE_BMSNODE)
-        {
-            // propogate the byte down the bus, not matter what else
-            // is going on
-            if (BUF_NOTFULL())
-            {
-                // stuff byte into tx buffer
-                txbuf[headp++] = ch;
-                headp &= 0x1F;
-                TXINT_ENABLE();
-            }
-        }
+        uint8_t ch = USART0.RXDATAL;
 
         // process bytes into packets
         pkt_parser(ch);
@@ -186,21 +186,21 @@ ISR(USART0_RX_vect)
 
 // serial TX interrupt handler
 // called whenever there is space in the outgoing data buffer
-ISR(USART0_UDRE_vect)
+ISR(USART0_DRE_vect)
 {
     // get uart status
-    uint8_t flags = UCSR0A;
+    uint8_t flags = USART0.STATUS;
 
     // check for data in buffer to send
     if (BUF_NOTEMPTY())
     {
         // make sure uart tx buffer is free (this should always be true)
-        if (flags & _BV(UDRE0))
+        if (flags & USART_DREIF_bm)
         {
             // read byte from buffer and write to uart TX
             // clear TXC0 so that it can be used to detect tx complete
-            UCSR0A |= _BV(TXC0);
-            UDR0 = txbuf[tailp++];
+            USART0.STATUS |= USART_TXCIF_bm;
+            USART0.TXDATAL = txbuf[tailp++];
             tailp &= 0x1F;
         }
     }
@@ -214,7 +214,7 @@ ISR(USART0_UDRE_vect)
     // once the last byte is completely shifted out
 }
 
-ISR(USART0_TX_vect)
+ISR(USART0_TXC_vect)
 {
     // on entry here, the last byte should have been shifted out and
     // there is no more data to send.
@@ -232,15 +232,11 @@ ISR(USART0_TX_vect)
     {
         // disable the TXC interrupt
         // this indicates to serial module that TX no longer in use
-        UCSR0B &= ~_BV(TXCIE0);
+        USART0.CTRLA &= ~USART_TXCIE_bm;
 
-        // for shared tx/rx boards
-        if (g_board_type >= BOARD_TYPE_BMSNODE)
-        {
-            // disable UART TX, and enable UART RX
-            UCSR0B &= ~_BV(TXEN0);
-            UCSR0B |= _BV(RXEN0);
-        }
+        // disable UART TX, and enable UART RX
+        USART0.CTRLB &= ~USART_TXEN_bm;
+        USART0.CTRLB |= USART_RXEN_bm;
     }
 }
 

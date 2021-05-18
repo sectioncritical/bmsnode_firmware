@@ -1,7 +1,7 @@
 #ifndef __SLEEP_H__
 #define __SLEEP_H__
 
-#define SLEEP_MODE_PWR_DOWN (88)
+//#define SLEEP_MODE_PWR_DOWN (88)
 
 #ifdef __cplusplus
 extern "C" {

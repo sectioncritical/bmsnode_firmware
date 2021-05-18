@@ -83,6 +83,11 @@ static enum shunt_status shunt_runner(unsigned int count)
 
 TEST_CASE("shunt start")
 {
+    TCA0.SINGLE.CTRLA = 0;
+    TCA0.SINGLE.CTRLB = 0;
+    TCA0.SINGLE.CTRLC = 0;
+    TCA0.SINGLE.CMP1 = 99;  // use non-zero to verify it gets written
+    TCA0.SINGLE.PER = 0;
     RESET_FAKE(tmr_set);
     tmr_set_fake.return_val = 1000;
     shunt_stop(); // place in known state
@@ -91,8 +96,11 @@ TEST_CASE("shunt start")
     CHECK(tmr_set_fake.call_count == 3); // tmr_set called by start(2) and get_status
     CHECK(shunt_get_status() == SHUNT_IDLE);
     CHECK(shunt_get_pwm() == 0);
-    CHECK(OCR1BH == 0);
-    CHECK(OCR1BL == 0);
+    CHECK(TCA0.SINGLE.CTRLA == 0x07);
+    CHECK(TCA0.SINGLE.CTRLB == 0x23);
+    CHECK(TCA0.SINGLE.CTRLC == 0);
+    CHECK(TCA0.SINGLE.PER == 256);
+    CHECK(TCA0.SINGLE.CMP1 == 0);
 }
 
 TEST_CASE("shunt stop")
@@ -161,13 +169,13 @@ TEST_CASE("shunt run starting conditions")
 
     SECTION("not running")
     {
+        TCA0.SINGLE.CMP1 = 99; // check for change
         status = shunt_run();
         CHECK(status == SHUNT_OFF);
         CHECK(adc_get_cellmv_fake.call_count == 0);
         CHECK(adc_get_tempC_fake.call_count == 0);
         CHECK(shunt_get_pwm() == 0);
-        CHECK(OCR1BH == 0);
-        CHECK(OCR1BL == 0);
+        CHECK(TCA0.SINGLE.CMP1 == 0);   // when off, pwm is forced to 0
     }
 
     // normal situation
@@ -176,13 +184,16 @@ TEST_CASE("shunt run starting conditions")
     SECTION("start nominal undervolt")
     {
         shunt_start();  // turn it on
+        TCA0.SINGLE.CMP1 = 99;  // make sure it gets changed
         status = shunt_runner(1);
         // nominal voltage is below shunt voltage
         CHECK(status == SHUNT_IDLE);
         CHECK(tmr_expired_fake.call_count == 2);
         CHECK(adc_get_cellmv_fake.call_count == 1);
         CHECK(adc_get_tempC_fake.call_count == 1);
+        CHECK(TCA0.SINGLE.CMP1 == 0);
         // check again to make sure it stays in this state
+        TCA0.SINGLE.CMP1 = 99;  // make sure it gets changed
         status = shunt_runner(1);
         // nominal voltage is below shunt voltage
         CHECK(status == SHUNT_IDLE);
@@ -190,8 +201,7 @@ TEST_CASE("shunt run starting conditions")
         CHECK(adc_get_cellmv_fake.call_count == 2);
         CHECK(adc_get_tempC_fake.call_count == 2);
         CHECK(shunt_get_pwm() == 0);
-        CHECK(OCR1BH == 0);
-        CHECK(OCR1BL == 0);
+        CHECK(TCA0.SINGLE.CMP1 == 0);
     }
 
     // voltage is between high and low limits
@@ -209,8 +219,7 @@ TEST_CASE("shunt run starting conditions")
         shunt_runner(255);  // let pwm settle
         uint16_t pwm = shunt_get_pwm();
         CHECK(pwm == 128);
-        CHECK(OCR1BH == 0);
-        CHECK(OCR1BL == 128);
+        CHECK(TCA0.SINGLE.CMP1 == 128);
 
         // check again to make sure it stays in this state
         status = shunt_runner(1);
@@ -219,8 +228,7 @@ TEST_CASE("shunt run starting conditions")
         CHECK(adc_get_cellmv_fake.call_count == 257); /// prior 256 calls plus new one
         CHECK(adc_get_tempC_fake.call_count == 257);
         CHECK(shunt_get_pwm() == 128);
-        CHECK(OCR1BH == 0);
-        CHECK(OCR1BL == 128);
+        CHECK(TCA0.SINGLE.CMP1 == 128);
 
         // check additional pwm values
         adc_get_cellmv_fake.return_val = 4025;

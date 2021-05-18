@@ -39,30 +39,37 @@ DEFINE_FFF_GLOBALS;
 // declare C-type functions
 extern "C" {
 
-// mock function for ser_write
+// mock functions for eeprom operations
 FAKE_VALUE_FUNC(uint8_t, eeprom_read_byte, const uint8_t *);
 FAKE_VALUE_FUNC(uint32_t, eeprom_read_dword, const uint32_t *);
 FAKE_VOID_FUNC(eeprom_update_block, const void *, void *, size_t);
 FAKE_VOID_FUNC(eeprom_read_block, void *, const void *, size_t);
 
+// fake eeprom locations defined in cfg.c for unit testing
+extern uint8_t fake_eeprom[];
+extern uint32_t fake_uid;
+extern uint8_t fake_type;
+
+// NOTE older firmware for '841 had to use eeprom_nnn functions for
+// reading eeprom. And this test used the fff to fake out the eeprom
+// read functions. But with the '1614, it can read the eeprom as memory
+// mapped so eeprom read functions are no longer needed.
+// eeprom_update_block is still used though, for writing
+
 }
 
 TEST_CASE("Read uid")
 {
-    RESET_FAKE(eeprom_read_dword);
-    eeprom_read_dword_fake.return_val = 0x12345678;
+    fake_uid = 0x12345678;
     uint32_t uid = cfg_uid();
     CHECK(uid == 0x12345678);
-    CHECK(eeprom_read_dword_fake.call_count == 1);
 }
 
 TEST_CASE("Read board type")
 {
-    RESET_FAKE(eeprom_read_byte);
-    eeprom_read_byte_fake.return_val = 0x42;
+    fake_type = 0x42;
     uint8_t board_type = cfg_board_type();
     CHECK(board_type == 0x42);
-    CHECK(eeprom_read_byte_fake.call_count == 1);
 }
 
 static void update_crc(config_t *cfg)
@@ -73,7 +80,7 @@ static void update_crc(config_t *cfg)
     cfg->crc = crc;
 }
 
-static uint8_t eeprom_data[512];
+static uint8_t eeprom_data[256];
 
 static void eeprom_read_block_custom_fake(void *dst, const void *src, size_t cnt)
 {
