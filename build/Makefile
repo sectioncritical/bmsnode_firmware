@@ -33,31 +33,25 @@ PKG?=0.0.0
 # default serial data rate
 BAUD?=9600
 
-# AVRDUDE ports
+# MCUPROG ports
 # you will need to override these for your system. The easiest thing to do
 # is to set an environment variable and then you wont need to type on command
 # line each time you run this Makefile.
 #
-# AVRDUDE_PORT is the device port used for programmer like ArduinoISP
-# it is used for any Makefile targets that "program" something. If you are
+# MCUPROG_PORT is the serial port used for UPDI programmer pymcuprog.
+# It is used for any Makefile targets that "program" something. If you are
 # not using the programmer, then this does not matter.
 #
-AVRDUDE_PORT?=/dev/cu.usbmodem14101
+MCUPROG_PORT?=/dev/cu.usbmodem14101
 
-# LOAD_PORT is a device serial port used for using avrdude or bmsloader with
+# LOAD_PORT is a device serial port used for using bmsloader with
 # the serial boot loader. It is the serial port that is connected to your
 # bmsnode boards. This is used with "upload" targets.
 #
 LOAD_PORT?=/dev/cu.usbserial-A107LYRO
 
-# settings for avrdude binary. You can override these to match your system.
-# avrdude should be installed somewhere on your system. The default setting
-# below assumes it is on your path. Standard avrdude does not include
-# support for t841 so the t841.conf file is specified as a supplement.
-# You can override the location of avrdude executable and conf file if you
-# need to. (the + means add to system configuration)
-AVRDUDE?=$(shell command -v avrdude)
-AVRDUDE_CONF?= +avrdude/t841.conf
+# command to run pymcuprog with all the common args filled out
+MCUPROG=venv/bin/pymcuprog -d attiny1614 -t uart -u $(MCUPROG_PORT)
 
 # Atmel device pack location
 PACK_ROOT?=/opt/avr/ATtiny_DFP
@@ -123,12 +117,13 @@ help:
 	@echo "-----------"
 	@echo "all/(default)    - build the firmware hex file (BAUD)"
 	@echo "clean            - delete all build products"
-	@echo "program          - program dev build to target using avrdude/programmer"
+	@echo "program          - program dev build to target using programmer"
 	@echo "upload           - upload dev build with serial boot loader (no dfu) (BAUD)"
 	@echo "dfuload          - upload with dfu command first (ADDR, BAUD)"
 	@echo "dfuping          - ping boot loader with dfu command first (ADDR, BAUD)"
 	@echo "discover         - probe bus for connected devices (BAUD)"
 	@echo "monitor          - run bus monitoring program (BAUD)"
+	@echo "reset            - perform UPDI reset using programmer"
 	@echo ""
 	@echo "In-system firmware update (old firmware running)"
 	@echo "-----------"
@@ -139,9 +134,9 @@ help:
 	@echo "fuses            - program the fuses using programmer"
 	@echo "provision BOARD=oshparkv4 - provision the board info (one-time)"
 	@echo "program_boot     - program the boot loader using programmer (BAUD)"
-	@echo "program_boot_old - program old version of boot loader"
 	@echo "erase            - erase the device using programmer (not usual)"
 	@echo "boardinfo        - read board provisioning info"
+	@echo "dumpfuses        - dump fuse contents to console, using programmer"
 	@echo ""
 	@echo "Release and Packaging"
 	@echo "---------------------"
@@ -167,7 +162,7 @@ help:
 	@echo "ADDR            = $(ADDR)"
 	@echo "BAUD            = $(BAUD)"
 	@echo "LOAD_PORT       = $(LOAD_PORT)"
-	@echo "AVRDUDE_PORT    = $(AVRDUDE_PORT)"
+	@echo "MCUPROG_PORT    = $(MCUPROG_PORT)"
 	@echo ""
 	@echo "NOTES"
 	@echo "-----"
@@ -213,39 +208,43 @@ clean:
 
 # flash the firmware onto the target
 .PHONY: program
-program: $(HEXFILE)
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+program: $(HEXFILE) venv
+	$(MCUPROG) write -f $<
 
 # dump the flash contents into a file
 .PHONY: dumpflash
-dumpflash:
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:r:flash_dump.bin:r
+dumpflash: venv
+	$(MCUPROG) read -m flash -f flash_dump.hex
 
 .PHONY: program_boot
-program_boot: bootloader/optiboot/optiboot_bms_8_$(BAUD)_hd.hex
+program_boot: bootloader/optiboot_x/optiboot_bmsnodev3.hex venv
 	echo "Using $(BAUD) boot loader"
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
-
-.PHONY: program_boot_old
-program_boot_old: bootloader/optiboot/optiboot_bms_8_4800.hex
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U flash:w:$<:i
+	$(MCUPROG) write -f $<
 
 .PHONY: upload
 upload: $(UPLOADFILE) venv
 	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< upload
 	venv/bin/bmsloader -d $(LOAD_PORT) -b $(BAUD) -f $< verify
 
-.PHONY: upload_old
-upload_old: $(UPLOADFILE)
-	$(AVRDUDE) -P$(AVRDUDE_LOAD_PORT) -b4800 -v -p attiny841 -C $(AVRDUDE_CONF) -c arduino -U flash:w:$<:i
-
+# fuses - most of the fuses are fine in the default state.
+# the only fuse to change is fuse 8 - BOOTEND. It is set to 2 to
+# allocate 2 pages (0x200) to the boot loader. The app will start at 0x200
 .PHONY: fuses
-fuses:
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -Ulock:w:$(LOCKFUSE):m -Uhfuse:w:$(HFUSE):m -Ulfuse:w:$(LFUSE):m -Uefuse:w:$(EFUSE):m
+fuses: venv
+	$(MCUPROG) write -m fuses -o 8 -l 2
+
+# dumps fuses to screen
+.PHONY: dumpfuses
+dumpfuses: venv
+	$(MCUPROG) read -m fuses
 
 .PHONY: erase
-erase:
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -e
+erase: venv
+	$(MCUPROG) erase
+
+.PHONY: reset
+reset: venv
+	$(MCUPROG) reset
 
 .PHONY: test
 test:
@@ -292,28 +291,33 @@ venv: venv/bin/activate
 venv/bin/activate: requirements.txt
 	test -d venv || $(PY3) -m venv venv
 	. venv/bin/activate; pip install -U pip setuptools wheel; pip install -Ur $<
+	venv/bin/safety check
 	touch venv/bin/activate
 
 .PHONY: cleanvenv
 cleanvenv:
 	rm -rf venv
 
+.PHONY: safety
+safety: venv
+	venv/bin/safety check
+
 ######################
 #### PROVISIONING ####
 
 # generate provisioning file and write to eeprom of device
 .PHONY: provision
-provision:
+provision: venv
 	mkdir -p provisioning
 	venv/bin/python provtool.py --write provisioning/provision.hex --board $(BOARD)
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U eeprom:w:provisioning/provision.hex:i
+	$(MCUPROG) write -f provisioning/provision.hex
 
 # read provisioning info from board
 .PHONY: boardinfo
-boardinfo:
+boardinfo: venv
 	mkdir -p provisioning
-	$(AVRDUDE) -P$(AVRDUDE_PORT) -b19200 -v -p attiny841 -C $(AVRDUDE_CONF) -c stk500v1 -U eeprom:r:provisioning/eeinfo.hex:i
-	venv/bin/python provtool.py --read provisioning/eeinfo.hex
+	$(MCUPROG) read -m user_row -f provisioning/provinfo.hex
+	venv/bin/python provtool.py --read provisioning/provinfo.hex
 
 ###################
 #### RELEASING ####
