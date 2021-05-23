@@ -132,6 +132,8 @@ of the responding node.
 |  8 | SHUNTOFF| turn off shunting                 |
 |  9 | SETPARM | set configuration parameter       |
 | 10 | GETPARM | get configuration parameter       |
+| 11 | TESTMODE| place hardware into various test modes |
+| 12 | FACTORY | restore parameters to default     |
 
 See [Command Specification](command) for command details.
 

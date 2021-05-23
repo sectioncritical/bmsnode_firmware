@@ -16,20 +16,23 @@ charging.
 System Context
 --------------
 
-The BMSNode device consist of a circuit board that is inspired by the
-"diyBMSv4" project:
+This project was originally inspired by the diyBMSv4" project:
 
 https://github.com/stuartpittaway/diyBMSv4
 
-The initial BMSNode product uses prototypes from the above project. In the
-future the hardware design may be updated, but that is a separate project.
-For the purpose of firmware requirements, the firmware is expected to run on
-this kind of circuit board.
+The early prototypes were based on this, but since then BMSNode has been
+completely redesigned from scratch and is now subtantially different from the
+"diyBMSv4".
 
-Each node is powered by the cell it is monitoring. Each node also has a serial
-transmit and receive signal loop. The TX of one node is connected to the RX
-of the next node in the chain. The TX circuit uses an optocoupler to
-electically isolate each node from the next.
+Each node is powered by the cell it is monitoring. There is a half-duplex
+asynchronous serial bus that daisy chains between all BMSNodes in a group.
+The transmit and receive signals are shared on each node. Each node has a
+unique address that is part of the serial protocol. A node will not transmit
+unless it is addressed with a command from the controller.
+
+Each BMSNode has an optical isolation circuit that provides a tap for the node
+to be able to listen and transmit on the bus, as well as propagate the serial
+data to the next node in the chain.
 
 All the nodes are connected in a chain this way. Each end of the chain is
 connected back to a controller device which may be something like a Raspberry
@@ -230,7 +233,7 @@ technically possible while still being able to respond to commands and voltage
 or temperature actions.
 
 During shunting operation, the goal is to consume power from the battery cell.
-Therefore it is permissible for the BMSNode iFirmware to operate at a high
+Therefore it is permissible for the BMSNode Firmware to operate at a high
 power level while shunting is in effect, and not necessary to stay in a low
 power mode.
 
@@ -275,27 +278,26 @@ The following are constraints that constitue non-functional requirements:
 ### CR1 - MCU Resources
 
 The BMSNode Firmware shall execute within the resources of the microcontroller.
-At the time of this writing, the MCU is an ATTiny841, which has the following
+At the time of this writing, the MCU is an ATTiny1614, which has the following
 constraints:
 
-* CPU clock - 8 MHz
-* Flash memory - 8 kbytes (for application + boot loader)
-* RAM - 512 bytes
-* EEPROM - (used for parameters) 512 bytes
+* CPU clock - 20 MHz
+* Flash memory - 16 kbytes (for application + boot loader)
+* RAM - 2048 bytes
+* EEPROM - (used for parameters) 256 bytes
 
-- CR.1 - firmware shall be designed to run with 8 MHz system clock
+- CR.1 - firmware shall be designed to run with 20 MHz or less system clock
 - CR.2 - firmware compiled size, including any boot loader and other data that
-  is stored in flash, must not be larger than 8 kbytes
-- CR.3 - the firmware shall not use more that 512 bytes of RAM, including
+  is stored in flash, must not be larger than 16 kbytes
+- CR.3 - the firmware shall not use more that 2048 bytes of RAM, including
   variable, stack, and heap
-- CR.4 - configurable parameters shall not be larger than 512 bytes
+- CR.4 - configurable parameters shall not be larger than 256 bytes
 
 ### CR2 - Serial bus
 
-The BMSNode hardware is limited on the maximum serial speed to 4800, until
-modifications are made to the hardware.
+The BMSNode hardware is limited on the maximum serial speed to 9600.
 
-- CR.1 - the serial bus shall operate at a rate of 4800 bps
+- CR.1 - the serial bus shall operate at a rate of 9600 bps
 
 ### CR3 - Firmware Version
 
@@ -377,5 +379,6 @@ is subject to the release process and release testing.
 |   0.9   |Switch to 2400, until hardware improves                  |
 |   0.10  |Shunt PWM                                                |
 |   0.10.x|Feature refinement and bug fixing                        |
+|   0.11.x|Port from ATtiny841 to 1614, and v3 hardware             |
 |   1.0   |First production release                                 |
 

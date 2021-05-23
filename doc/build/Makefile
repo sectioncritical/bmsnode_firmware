@@ -43,7 +43,7 @@ cleanimg:
 	rm -f $(DIAGRAMS)
 
 %.png: %.ditaa
-	ditaa $< -S -o
+	ditaa -E $< -S -o
 
 %.svg: %.smcat
 	smcat $<

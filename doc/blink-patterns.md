@@ -1,7 +1,7 @@
 BMSNode Blink Codes
 ===================
 
-TODO: this documents should be brought into a higher level app-level spec.
+TODO: this document should be brought into a higher level app-level spec.
 
 This is a placeholder document to keep track of the meanings of blink
 patterns as the firmware is developed.

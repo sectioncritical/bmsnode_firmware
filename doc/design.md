@@ -50,12 +50,13 @@ A purpose-built docker image is used for CI automation. See the
 Execution Environment
 ---------------------
 
-BMSNode firmware runs on an ATTiny841 AVR microcontroller.
+BMSNode firmware runs on an ATTiny1614 AVR microcontroller (as of v3 boards,
+prior versions used ATTiny841).
 
-* 8 MHz
-* 8k program storage (flash)
-* 512 bytes RAM (data, heap, stack)
-* 512 bytes EEPROM-like persistent storage
+* 10 MHz
+* 16k program storage (flash)
+* 2048 bytes RAM (data, heap, stack)
+* 256 bytes EEPROM-like persistent storage
 
 The firmware makes use of the following peripherals:
 
@@ -67,16 +68,17 @@ The firmware makes use of the following peripherals:
 * GPIO
 
 The firmware makes use of a boot loader to allow field updates of the
-application. The boot loader is a variant of optiboot. See the subdirectory
-`./build/optiboot` for details. The optiboot boot loader used about 640 bytes
-at this time. To allow some margin for possible feature expansion, 1k is
-reserved for the boot loader leaving 7k for the application.
+application. The boot loader is a variant of optiboot_x. See the subdirectory
+`./build/bootloader/optiboot_x` for details. The optiboot_x boot loader uses
+a little less than 512 bytes at this time and occupies the two lowest pages
+in flash, in the "boot" section.
 
 Design Overview
 ---------------
 
 The firmware follow the typical embedded application pattern of using a main
-loop to run the various processes.
+loop to run the various processes and a simple state machine to track the
+device functional states.
 
 When the program starts it initializes the hardware execution environment
 (hardware peripheral registers) and various module components (software init).
@@ -101,7 +103,7 @@ for each state.
 
 #### Hardware Timer
 
-Hardware timer 0 is used to generate a 1 millisecond tick using an interrupt.
+Hardware timer TCB0 is used to generate a 1 millisecond tick using an interrupt.
 The interrupt handler increments a 16-bit counter, providing the ability to
 count up to 65535 milliseconds. However, to implement 16-bit timer comparison
 math, the maximum timeout for the 1-millisecond timer is 32767 milliseconds.
@@ -110,9 +112,9 @@ The hardware timer code is part of the `tmr` module (see below).
 #### Serial Receive and Transmit
 
 Hardware interrupts are used for receiving and transmitting serial data.
-Because the UART RX and TX signals are tied together by the half-duplex
-hardware design, only RX or TX is active at one time. The normal resting state
-is that TX is disable and RX is enabled in order to receive any data.
+The MCU UART peripheral support half duplex in hardware and uses a shared pin.
+The firmware is usually listening in receive (RX) mode. It will transmit when
+there is a command requiring a response.
 
 The receive interrupt receives any incoming bytes and passes the byte to the
 packet parser (see `pkt` module). The packet parser assembles packets from the

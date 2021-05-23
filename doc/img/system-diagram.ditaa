@@ -3,17 +3,17 @@
 
                            +----------+
                            |Controller|
-        optically isolated |          |
+        async serial bus   |          |
    /-<---------------------*TX      RX*<----------------------\
-   |     async serial bus  |          |                       |
-   |                       |          |                       |
-   |                       +----------+                       |
+   |    optically isolated |          |                       |
+   |    half duplex        |          |                       |
+   |    multidrop          +----------+                       |
    |                                                          |
    |                                                          |
    |    +--------+          +--------+          +--------+    |
-   |    | Node 1 |          | Node 2 |          | Node N |    |
-   |    |        |          |        |          |        |    |
-   \--->*RX    TX*--------->*RX    TX*-----=--->*RX    TX*=->-/
+   \--->*  Opto  *--------->*  Opto  *----=---->*  Opto  *=->=/
+        |--------|          |--------|          |--------|
+        | Node 1 |          | Node 2 |          | Node N |
         |        |          |        |          |        |
         | V   GND|          | V   GND|          | V   GND|
         +-*----*-+          +-*----*-+          +-*=---*-+
