@@ -79,6 +79,10 @@ void device_init(void)
     PORTA.DIR = PORTADIR;      // from iomap.h
     PORTB.DIR = PORTBDIR;
 
+    // set unused RX input pin to pullup
+    // this prevents it from floating and in theory saves power
+    RX_PORT.RX_PINCTRL = PORT_PULLUPEN_bm;
+
     // enable the USART0 alt pin muxing to get to the pins we want to use
     PORTMUX.CTRLB = PORTMUX_USART0_ALTERNATE_gc;
 

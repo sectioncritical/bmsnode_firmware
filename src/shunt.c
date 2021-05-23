@@ -89,11 +89,11 @@ void shunt_start(void)
     TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP1EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc;
 
     // set up period for PWM freq
-    // 10 MHz / 8 / 256 ==> ~4.8 kHz
+    // 10 MHz / 64 / 256 ==> ~610 kHz
     TCA0.SINGLE.PER = 256;
 
     // finally, enable the timer
-    TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV8_gc | TCA_SINGLE_ENABLE_bm;
+    TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV64_gc | TCA_SINGLE_ENABLE_bm;
 
     // set initial PWM to 0
     shunt_set(0);

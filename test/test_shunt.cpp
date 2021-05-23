@@ -96,7 +96,7 @@ TEST_CASE("shunt start")
     CHECK(tmr_set_fake.call_count == 3); // tmr_set called by start(2) and get_status
     CHECK(shunt_get_status() == SHUNT_IDLE);
     CHECK(shunt_get_pwm() == 0);
-    CHECK(TCA0.SINGLE.CTRLA == 0x07);
+    CHECK(TCA0.SINGLE.CTRLA == 0x0B);
     CHECK(TCA0.SINGLE.CTRLB == 0x23);
     CHECK(TCA0.SINGLE.CTRLC == 0);
     CHECK(TCA0.SINGLE.PER == 256);

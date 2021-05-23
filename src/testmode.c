@@ -67,7 +67,7 @@ static uint16_t blink_timeout;  // timeout used for blink sequence
 void testmode_off(void)
 {
     // just turn it all off
-    VREF_OFF;
+    //VREF_OFF;     // controlled by main loop wake/sleep
     IO_OFF;
     shunt_stop();
     SHUNT_OFF;
@@ -90,6 +90,8 @@ void testmode_on(testmode_status_t testfunc, uint8_t val0, uint8_t val1)
             testmode_off();
             break;
 
+        // this has no meaning because the reference is turned on whenever
+        // the bmsnode is awake
         case TESTMODE_VREF:         // turn on the vref
             VREF_ON;
             break;

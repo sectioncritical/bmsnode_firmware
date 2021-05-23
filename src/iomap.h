@@ -59,6 +59,7 @@
 #define RX_PORT         PORTA
 #define RX_PIN          PIN2_bm
 #define RX_DIR          0       // input
+#define RX_PINCTRL      PIN2CTRL
 
 #define EXTIO_PORT      PORTA
 #define EXTIO_PIN       PIN3_bm
@@ -102,7 +103,7 @@
 #define REFON_PIN       PIN3_bm
 #define REFON_DIR       (REFON_PIN)
 
-#define PORTADIR        (TX_DIR | EXTIO_DIR | GREEN_DIR)
+#define PORTADIR        (TX_DIR | EXTIO_DIR | GREEN_DIR | SPAREIO_PIN)
 #define PORTBDIR        (LOADON_DIR | BLUE_DIR | REFON_DIR)
 
 #endif
