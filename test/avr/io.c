@@ -13,6 +13,8 @@ RSTCTRL_t RSTCTRL;
 TCB_t TCB0;
 TCA_t TCA0;
 ADC_t ADC0;
+ADC_t ADC1;
+VREF_t VREF;
 
 /*volatile uint8_t MCUSR = 0;
 volatile uint8_t PRR = 0;

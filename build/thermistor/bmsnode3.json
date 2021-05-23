@@ -1,0 +1,12 @@
+{
+    "board": "BMSNode 3.0.0 board",
+    "thermistor": "TDK NTCG163JF103FT1",
+    "Tstart": 0,
+    "Tstop": 80,
+    "Tstep": 4,
+    "Tnominal": 25,
+    "Rnominal": 10000,
+    "Rpulldown": 10000,
+    "beta": 3380,
+    "counts": 1023
+}

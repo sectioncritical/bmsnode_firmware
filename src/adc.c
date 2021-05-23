@@ -40,8 +40,24 @@
 // 8 ==> smoothing constant of 0.25
 #define FILTER_WEIGHT 8
 
+// convenience macro to check if ADC is enabled
+// only check ADC1 but assume ADC0 and 1 track
+#define ADC_ENABLED (ADC1.CTRLA & 1)
+
 // channel map - mux channels to sample
-static const uint8_t channels[4] = { 7, 4, 11, 0x1E };
+#define NUM_CHANNELS 4
+static const struct
+{
+    ADC_t *padc;
+    uint8_t muxpos;
+    uint8_t refsel;
+} channels[NUM_CHANNELS] =
+        // note for vsense mux is 7 for adc0 and 3 for adc1
+    {   { &ADC1, 3, ADC_REFSEL_INTREF_gc },     // VSENSE
+        { &ADC0, 4, ADC_REFSEL_VDDREF_gc },     // TSENSE
+        { &ADC0, 11, ADC_REFSEL_VDDREF_gc },    // EXTTEMP
+        { &ADC0, 0x1E, ADC_REFSEL_INTREF_gc }   // MCU temp sensor
+    };
 
 // storage for sample data
 static uint16_t results[4];
@@ -61,15 +77,16 @@ static uint16_t adc_timeout;
 // Given input clock is 10 MHz, choose /16 prescaler
 // 10/16 ==> 625 kHz --> 1.6 uS cycle time
 //
-// using initial delay of 16 cycles (only happens on startup)
-// longest possible conversion is 31 cycles (typical is 15)
-// conversion time ==> 50 uS max
+// The normal conversion is 2 clocks sample time plus 13 clocks conversion,
+// for a total of 15 ADC cycles or 24 uS. To try and improve accuracy, the
+// sampel time is further extended by another 8 cycles for a total sample
+// time of 10 cycle or 16 uS. Now, total conversion time is 10+13=23 cycles
+// or 36.8 uS.
 //
-
-// initialize and power up ADC circuits, mainly the external reference
-// this must be called before using adc_samplee(). And it should be 3-4 ms
-// after calling this before using adc_sample() to allow the external ref
-// to settle
+// initialize and power up ADC circuits, and set up references. This must be
+// called before using adc_sample().
+// Because different references are needed, both ADC0 and ADC1 are used, each
+// using a different reference.
 void adc_powerup(void)
 {
     // disable digitial inputs for the analog inputs
@@ -78,11 +95,32 @@ void adc_powerup(void)
     PORTA.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;
     PORTB.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;
 
-    // turn on external reference and init the ADC
-    REFON_PORT.OUTSET = REFON_PIN;  // ext ref turned on
-    ADC0.CTRLC = ADC_REFSEL_VREFA_gc | ADC_PRESC_DIV16_gc; // ext ref and /16
-    ADC0.CTRLD = ADC_INITDLY_DLY16_gc;  // initialization delay 16 cycles
-    ADC0.CTRLA = 1; // enable ADC
+    // turn on the GPIO used as external supply for resistor dividers
+    REFON_PORT.OUTSET = REFON_PIN;
+
+    // Set up VREF to provide 1.1V ref for ADC0 and 2.5V for ADC1
+    // ADC1 will be used for measuring the voltage and needs 2.5 reference
+    // ADC0 will be used for measuring the two temp sensors and the internal
+    // temp sensor. The external temp sensors need VDD reference and the
+    // MCU temp sensor need 1.1V reference.
+    VREF.CTRLA = VREF_ADC0REFSEL_1V1_gc;
+    VREF.CTRLC = VREF_ADC1REFSEL_2V5_gc;
+
+    // set up ADC1 which is used for voltage measurement
+    ADC1.CTRLC = ADC_SAMPCAP_bm         // reduced sampcap
+               | ADC_REFSEL_INTREF_gc   // internal reference
+               | ADC_PRESC_DIV16_gc;    // prescaler /16
+    ADC1.SAMPCTRL = 8;                  // add 8 more sampling cycles
+    ADC1.CTRLA = 1;                     // enable ADC
+
+    // set up ADC 0 which is used for temperature measurements
+    // we set reference here, but it needs to change dynamically depending
+    // on which temp is being measured
+    ADC0.CTRLC = ADC_SAMPCAP_bm         // reduced sampcap
+               | ADC_REFSEL_VDDREF_gc   // VDD reference
+               | ADC_PRESC_DIV16_gc;    // prescaler /16
+    ADC0.SAMPCTRL = 8;                  // add 8 more sampling cycles
+    ADC0.CTRLA = 1;                     // enable ADC
 
     // reset the ADC timeout
     adc_timeout = tmr_set(3);
@@ -93,6 +131,7 @@ void adc_powerdown(void)
 {
     // shut down the ADC and turn off the external reference
     ADC0.CTRLA = 0;
+    ADC1.CTRLA = 0;
     REFON_PORT.OUTCLR = REFON_PIN;
 }
 
@@ -104,29 +143,44 @@ static uint16_t adc_filter(uint16_t sample, uint16_t smoothed)
     return smoothed;
 }
 
-// collect a set of ADC samples and store
-// must call adc_powerup() first
-void adc_sample(void)
+// collect one sample from the specific ADC using parameters
+// does not filter
+// Per timing notes above, a conversion takes about 40 uS and we do two here.
+// So this function takes about 80 uS and is blocking.
+uint16_t adc_sample(ADC_t *padc, uint8_t muxpos, uint8_t refsel)
+{
+    padc->MUXPOS = muxpos;          // select channel
+    padc->CTRLC = ADC_SAMPCAP_bm | ADC_PRESC_DIV16_gc
+                | refsel;           // select reference
+    padc->COMMAND = 1;              // start conversion
+    while (!(padc->INTFLAGS & ADC_RESRDY_bm))
+    {}      // wait for conversion complete
+
+    // throw away the first result and run the conversion again.
+    // this enforces a settling time after the mux change
+    // NOT SURE IF THIS IS REALLY NECESSARY - NEED TO DO TESTING
+    // TODO: look into '1614 sample accumulation feature
+    // and 1614 sample delay feature
+    padc->INTFLAGS = ADC_RESRDY_bm; // clear ready flag
+    padc->COMMAND = 1;              // start conversion
+    while (!(padc->INTFLAGS & ADC_RESRDY_bm))
+    {}      // wait for conversion complete
+
+    // return the reading, filtering to be done by caller
+    return padc->RES;
+}
+
+// make one pass through all the samples, filter, and save.
+// There are 4 channels and each call to adc_sample() is about 80 uS, so
+// this function will take about 320 uS and is blocking.
+void adc_collect(void)
 {
     // loop to read all the channels and store results
-    for (uint8_t idx = 0; idx < sizeof(channels); ++idx)
+    for (uint8_t idx = 0; idx < NUM_CHANNELS; ++idx)
     {
-        ADC0.MUXPOS = channels[idx];    // select channel
-        ADC0.COMMAND = 1;               // start conversion
-        while (!(ADC0.INTFLAGS & ADC_RESRDY_bm)) // wait for conversion complete
-        {}
-
-        // throw away the first result and run the conversion again.
-        // this enforces a settling time after the mux change
-        // TODO: look into '1614 sample accumulation feature
-        // and 1614 sample delay feature
-        ADC0.INTFLAGS = ADC_RESRDY_bm;  // clear ready flag
-        ADC0.COMMAND = 1;               // start conversion
-        while (!(ADC0.INTFLAGS & ADC_RESRDY_bm)) // wait for conversion complete
-        {}
-
-        // save result
-        uint16_t result = ADC0.RES;
+        uint16_t result = adc_sample(channels[idx].padc,
+                                     channels[idx].muxpos,
+                                     channels[idx].refsel);
         results[idx] = adc_filter(result, results[idx]);
     }
 }
@@ -134,10 +188,10 @@ void adc_sample(void)
 // run adc sampling at periodic interval
 void adc_run(void)
 {
-    if (tmr_expired(adc_timeout))
+    if (ADC_ENABLED && tmr_expired(adc_timeout))
     {
         adc_timeout += ADC_SAMPLE_PERIOD;
-        adc_sample();
+        adc_collect();
     }
 }
 
@@ -161,17 +215,15 @@ int16_t adc_get_tempC(enum adc_channel ch)
 {
     if (ch == ADC_CH_MCU_TEMP)
     {
-        // we are using 1.25V reference instead of 1.1 as required by
-        // MCU temp sensor. So attempt to adjust by using the ratio
-        // 1.25/1.1
-        int16_t mcutemp = results[ch] * 25;
-        mcutemp /= 22;
-        // Per the data sheet, the temp in C is offset by 275
-        // from the ADC value
-        // We are using a value determined by experimentation.
-        // May not be consistent across MCU lots. If we care about this
-        // temperature, we might have to add cal factors for it.
-        return mcutemp - 265;
+        // algorithm from 1614 data sheet
+        int8_t offset = SIGROW.TEMPSENSE1;
+        uint8_t gain = SIGROW.TEMPSENSE0;
+        uint32_t mcutemp = results[ch] - offset;
+        mcutemp *= gain;
+        mcutemp += 0x80;    // half bit rounding
+        mcutemp >>= 8;      // Kelvin
+        mcutemp -= 273;
+        return (int16_t)mcutemp;
     }
     else
     {

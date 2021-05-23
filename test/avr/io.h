@@ -2199,7 +2199,8 @@ extern RSTCTRL_t RSTCTRL;
 #define SLPCTRL           (*(SLPCTRL_t *) 0x0050) /* Sleep Controller */
 #define CLKCTRL           (*(CLKCTRL_t *) 0x0060) /* Clock controller */
 #define BOD                   (*(BOD_t *) 0x0080) /* Bod interface */
-#define VREF                 (*(VREF_t *) 0x00A0) /* Voltage reference */
+//#define VREF                 (*(VREF_t *) 0x00A0) /* Voltage reference */
+extern VREF_t VREF;
 #define WDT                   (*(WDT_t *) 0x0100) /* Watch-Dog Timer */
 #define CPUINT             (*(CPUINT_t *) 0x0110) /* Interrupt Controller */
 #define CRCSCAN           (*(CRCSCAN_t *) 0x0120) /* CRCSCAN */
@@ -2213,7 +2214,8 @@ extern PORT_t PORTA;
 extern PORT_t PORTB;
 //#define ADC0                  (*(ADC_t *) 0x0600) /* Analog to Digital Converter */
 extern ADC_t ADC0;
-#define ADC1                  (*(ADC_t *) 0x0640) /* Analog to Digital Converter */
+//#define ADC1                  (*(ADC_t *) 0x0640) /* Analog to Digital Converter */
+extern ADC_t ADC1;
 #define AC0                    (*(AC_t *) 0x0680) /* Analog Comparator */
 #define AC1                    (*(AC_t *) 0x0688) /* Analog Comparator */
 #define AC2                    (*(AC_t *) 0x0690) /* Analog Comparator */

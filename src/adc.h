@@ -91,6 +91,31 @@ extern void adc_powerdown(void);
 extern void adc_run(void);
 
 /**
+ * @internal
+ *
+ * Take a single ADC sample with specific parameters.
+ *
+ * @param padc pointer to ADC peripheral to use
+ * @param muxpos the ADC mux value to select the desired channel
+ * @param refsel the group configuration value for ADC reference selection
+ *
+ * This function will configure the specified ADC peripheral with the
+ * channel mux value and the selected reference. Refer to the data sheet
+ * for the valid choices for _muxpos_. The value of _refsel_ is expected to
+ * be one of the following: `ADC_REFSEL_VDDREF_gc`, or `ADC_REFSEL_INTREF_gc`.
+ * This function will block until the ADC conversion is complete. It takes
+ * about 80 uS.
+ *
+ * @note This is an internal function and should not be called directly. It is
+ * called by adc_run().
+ *
+ * @return the ADC sample value
+ */
+extern uint16_t adc_sample(ADC_t *padc, uint8_t muxpos, uint8_t refsel);
+
+/**
+ * @internal
+ *
  * Sample all the ADC channels and store the result.
  *
  * Before using this function, adc_powerup() should be called at least once,
@@ -102,12 +127,13 @@ extern void adc_run(void);
  * ADC sample data is stored in an internal cache and can be retreived using
  * other `adc_get_NNN()` functions.
  *
- * @deprecated Use adc_run() to collect samples instead of this function.
+ * This function is blocking until all the ADC data is collected. It takes
+ * about 400 uS.
  *
- * @note This function is blocking until all the ADC channels are sampled.
- * The blocking time is about 1 ms.
+ * @note This is an internal function and should not be called directly. It is
+ * called by adc_run().
  */
-extern void adc_sample(void);
+extern void adc_collect(void);
 
 /**
  * Return the cell voltage in millivolts.
