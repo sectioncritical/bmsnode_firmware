@@ -4,6 +4,46 @@
 
 <!--- next entry here -->
 
+## 0.11.0
+2021-05-24
+
+### Breaking changes
+
+#### Switch to attiny1614 MCU ... (2a55aa46d9d8e92b8f2dc927e6d3d6e5ab17419f)
+
+Port to attiny1614 for new v3 boards.
+
+#### large update throughout to support v3 boards with ATtiny1614 (e30d046c8e1ebe2f0c9a8ca7753367f0e07b334d)
+
+port to ATtiny1614 for new v3 boards
+
+- update firmware for new 1614 peripherals
+- update unit test code to match
+- update host utilities and provisioning
+- update docker image for new tools
+- runs on v3 board but not all features have been revalidated - WIP
+
+### Features
+
+- add ext and mcu temp readings #59 #63 (13a85c2701a2d53838f47fefd0708d9c6a62a956)
+- **test:** update unit tests for new firmware (234fbc9a661e0e5253d416ebc3021d7cd6a5060e)
+
+### Fixes
+
+- bmsloader dont fail verify due to boot vector [skip ci] (54ebcb713d245d6ee85e9a71c3c48d365cf2591d)
+- update doxygen theme, no functional changes (59a458143eadd1e3a4ab2efe0a7428d2f54642e6)
+- parser 5 sec timeout if partial packet rcvd #53 (1ef0f593e5e0951020332dc2a4b3f6ad89fb35cb)
+- add watchdog for all states #57 (ec0142371ed20600758fafd520ef471fcb175d23)
+- add code size check and todo report #16 #23 (03cab9428c2535adda2ccccb1ad3ce2c8b56be7c)
+- **bootloader:** add optiboot_x bootloader for 1614 mcu [skip ci] (93403db634dcb227a4340eefd0ffbf9192e46182)
+- **bootloader:** clean up bootloader files location [skip ci] (3dea763c7cf635d99827d9fe64ddd64f67260f21)
+- **bootloader:** reorg bl files, add optiboot_x prep for upcoming 1614 (d636d9f268b892582a42edac20d26f987fbf282e)
+- **build:** update docker to support attiny1614 build tools (f8632120b6fafb8a97b092e977a2c38ddf63a43f)
+- update provisioning for 1614, update bmsutil for optiboot_x (0c4dd1c2d61cd927362e1cc5e51e32b5cdf68130)
+- **add:** update ADC for v3 board/new MCU (175ae308bd40bbbf4978699331f658d559c7543c)
+- adjust pwm freq and set gpio for lower power (15b64e6fb7bd172e4cc5029d2963972530b66641)
+- update docs for new v3 design (a6a2718c1aaa3abd8cf070987b76fcebbab45fe1)
+
 ## 0.10.3
 2020-12-13
 
