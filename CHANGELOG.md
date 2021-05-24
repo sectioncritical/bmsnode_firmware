@@ -21,7 +21,7 @@ port to ATtiny1614 for new v3 boards
 - update unit test code to match
 - update host utilities and provisioning
 - update docker image for new tools
-- runs on v3 board but not all features have been revalidated - WIP
+- runs on v3 board
 
 ### Features
 
@@ -40,7 +40,7 @@ port to ATtiny1614 for new v3 boards
 - **bootloader:** reorg bl files, add optiboot_x prep for upcoming 1614 (d636d9f268b892582a42edac20d26f987fbf282e)
 - **build:** update docker to support attiny1614 build tools (f8632120b6fafb8a97b092e977a2c38ddf63a43f)
 - update provisioning for 1614, update bmsutil for optiboot_x (0c4dd1c2d61cd927362e1cc5e51e32b5cdf68130)
-- **add:** update ADC for v3 board/new MCU (175ae308bd40bbbf4978699331f658d559c7543c)
+- **adc:** update ADC for v3 board/new MCU (175ae308bd40bbbf4978699331f658d559c7543c)
 - adjust pwm freq and set gpio for lower power (15b64e6fb7bd172e4cc5029d2963972530b66641)
 - update docs for new v3 design (a6a2718c1aaa3abd8cf070987b76fcebbab45fe1)
 
