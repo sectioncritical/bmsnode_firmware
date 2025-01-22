@@ -1,0 +1,68 @@
+
+# This is performed by the main init code
+# and not actually implemented as a state.
+hwstart:
+    init hw
+    init modules
+    load config
+    ADC powerup
+    exit/ enable interrupts,
+
+powerup:
+    entry/ blue blink 50
+    entry/ idle timeout 1000,
+
+idle:
+    entry/ blue blink 200
+    entry/ idle timeout 1000
+    if activity
+    then idle timeout 1000,
+
+# used to keep node awake for at least
+# 8 seconds while DFU is started on the
+# bus for another node
+dfu:
+    entry/ blue blink 1000
+    entry/ idle timeout 8000,
+
+shunt:
+    entry/ enable WDT 1sec
+    entry/ init shuntmode
+    pet watchdog
+    run shuntmode
+    if CMD_SHUNTOFF
+    then shunt off
+    exit/ disable WDT,
+
+test:
+    entry/ enable WDT 1sec
+    pet watchdog
+    run testmode
+    exit/ disable WDT,
+
+sleep:
+    entry/ ADC powerdown
+    entry/ LEDs off
+    entry/ external load off
+    entry/ MCU sleep (pwrdn)
+    remain in pwrdn until wake
+    exit/ blue on
+    exit/ ADC powerup
+;
+
+hwstart     => powerup;
+powerup     => idle: idle timeout;
+
+idle        => idle: CMD_PING/green oneshot 1000;
+
+idle        => dfu: CMD_DFU;
+dfu         => idle: idle timeout;
+
+idle        => shunt: CMD_SHUNTON;
+shunt       => idle: shuntmode ends;
+
+idle        => test: CMD_TESTMODE;
+test        => idle: testmode ends;
+
+idle        => sleep: idle timeout;
+sleep       => idle: hw wake;
