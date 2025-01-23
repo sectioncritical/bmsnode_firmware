@@ -1,6 +1,15 @@
 BMS Cell Node Firmware
 ======================
 
+## 2025 update
+
+I moved this project from gitlab. It used gitlab CI and there are various links
+to gitlab stuff (like the badge links below). I have not updated any of this
+yet. So the CI is not working right now and you may run across bad links. I did
+update the API docs to be hosted at github so that link below is correct.
+
+* * * * *
+
 [![](https://gitlab.com/kroesche/bmsnode/badges/master/pipeline.svg)](https://gitlab.com/kroesche/bmsnode/pipelines)
 [![](https://gitlab.com/kroesche/bmsnode/badges/master/coverage.svg)](https://gitlab.com/kroesche/bmsnode/-/jobs/artifacts/master/file/test/reports/bmstest-coverage.html?job=test)
 [![](https://gitlab.com/kroesche/bmsnode/-/jobs/artifacts/master/raw/test/reports/check-badge.svg?job=test)](https://gitlab.com/kroesche/bmsnode/-/jobs/artifacts/master/file/test/reports/check/index.html?job=test)
@@ -48,7 +57,7 @@ Otherwise see the various README files and as a last resort see comments in
 script files. Most Makefiles have a `make help` target.
 
 The firmware source code is documented using doxygen-style comments. Generated
-documentation [can be found here](https://kroesche.gitlab.io/bmsnode/html/index.html).
+documentation [can be found here](https://sectioncritical.github.io/bmsnode_firmware/index.html).
 
 Tools and Environment
 ---------------------
